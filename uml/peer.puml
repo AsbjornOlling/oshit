@@ -1,0 +1,38 @@
+@startuml
+
+'
+' Class relationships
+'
+
+oSHIT -- Config
+oSHIT -- Crypto
+oSHIT -- FileHandler
+oSHIT -- Transport
+
+Transport -- In
+Transport -- Out
+Transport o-- Packet
+
+
+'
+' Methods and fields
+'
+
+oSHIT : introduce()
+
+Config : read_config()
+Config : parse_arguments()
+
+Crypto : publickey
+Crypto : privatekey
+Crypto : gen_keys()
+Crypto : encrypt()
+Crypto : decrypt()
+
+FileHandler : get_next_chunk()
+
+Transport : Packet[] packets
+Transport : send_keepalive()
+Transport : get_optimal_timeout()
+
+@enduml
