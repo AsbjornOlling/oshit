@@ -5,7 +5,9 @@ import argparse
 
 class Config:
     def __init__(self, oSHIT):
-        parser = argparse.ArgumentParser()
+        parser = argparse.ArgumentParser(prog="oshit",
+                                         usage="%(prog)s [--send OR --revc] [-f file] [-c crypto] ...",
+                                         description="A simple UDP Holepunching file Transfer program")
         group = parser.add_mutually_exclusive_group()
         group.add_argument("-s",
                            "--send",
@@ -33,8 +35,8 @@ class Config:
         args = parser.parse_args()
 
         if args.send:
-            print("send")
+            print("Call send method in Transfer class")
         elif args.recv:
-            print("recv")
+            print("Call recive method in Transfer class")
         else:
             print("You have to be either sender or reciver")
