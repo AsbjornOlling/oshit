@@ -32,7 +32,7 @@ class Config:
                             "--password",
                             type=str,
                             help="passphrase")
-        parser.add_argument("-l", "--log", type=int, choices=[0, 1, 2, 3])
+        parser.add_argument("-l", "--log", type=int, choices=list(range(0, 4)))
         args = parser.parse_args()
 
         if args.send:
