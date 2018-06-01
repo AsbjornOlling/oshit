@@ -16,5 +16,5 @@ class oSHIT:
         self.filehandler = filehandler.Filehandler(self)
 
 
-if __name__ is '__main__':
+if __name__ == '__main__':
     app = oSHIT()
