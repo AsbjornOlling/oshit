@@ -5,9 +5,11 @@ import argparse
 
 class Config:
     def __init__(self, oSHIT):
+        usage = "%(prog)s [--send OR --revc] [-f file] [-c crypto] ..."
+        desc = "A simple UDP Holepunching file Transfer program"
         parser = argparse.ArgumentParser(prog="oshit",
-                                         usage="%(prog)s [--send OR --revc] [-f file] [-c crypto] ...",
-                                         description="A simple UDP Holepunching file Transfer program")
+                                         usage=usage,
+                                         description=desc)
         group = parser.add_mutually_exclusive_group()
         group.add_argument("-s",
                            "--send",
