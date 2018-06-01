@@ -4,6 +4,6 @@ import argparse
 
 
 class Config:
-    def __init__(self):
+    def __init__(self, oSHIT):
         parser = argparse.ArgumentParser()
         parser.parse_args()
