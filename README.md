@@ -1,5 +1,5 @@
 # oSHIT
-**o**Shit is **S**hit **H**olepunched **I**ntelligent **T**ransfer
+**o**Shit is **S**imple **H**olepunched **I**ntelligent **T**ransfer
 
 TODO: write this README
 
