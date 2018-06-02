@@ -31,22 +31,28 @@ class Transport():
         ## DEBUGGING SHIT from here on
         ## Beware - this is barely code.
         ##
+
         # TEST CONNECT 
         self.logger.log(2, "Connecting to " + self.TEST_IP + ":" + str(self.TEST_PORT))
-        self.sock.connect((self.TEST_IP, self.TEST_PORT))
+        try:
+            self.sock.connect((self.TEST_IP, self.TEST_PORT))
+            self.logger.log(2, "Successfully connected.")
+        except:
+            self.logger.log(2, "Failed connect to" + self.TEST_IP + ":" + str(self.TEST_PORT))
 
-        # test send
-        print("SENDING")
-        self.sock.sendto(bytes("HELLO WORD", "utf-8"),
+        # TEST SEND
+        message = "HELLO WORLD"
+        self.logger.log(2, "Test-sending " + message)
+        self.sock.sendto(bytes(message, "utf-8"),
                          (self.TEST_IP, self.TEST_PORT))
 
         # test receive
-        print("RECEIVING")
+        chunk = 5  # TODO set to max size of udp packet
+        self.logger.log(2, "Entering infinite " + str(chunk) + " byte print loop")
         while True:
-            message = self.sock.recv(5)  # max size of udp packet
+            message = self.sock.recv(chunk)
             print("GITPACKET")
             print(message)
-
 
     def create_socket(self):
         """ Create a UDP socket to the TEST IP"""
