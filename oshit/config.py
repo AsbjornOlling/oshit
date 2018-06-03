@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
 import argparse
+import configparser
 
 
 class Config:
     def __init__(self, oSHIT):
+        # Gets run arguments and generate --help
         usage = "%(prog)s [--send OR --revc] [-f file] [-c crypto] ..."
         desc = "A simple UDP Holepunching file Transfer program"
         parser = argparse.ArgumentParser(prog="oshit",
@@ -34,8 +36,80 @@ class Config:
                             "--password",
                             type=str,
                             help="passphrase")
-        parser.add_argument("-l", "--log", type=int, choices=list(range(0, 4)))
+        parser.add_argument("-l",
+                            "--log",
+                            type=int,
+                            choices=list(range(0, 4)))
         args = parser.parse_args()
+
+        # Read config file if argument isnt set
+        config = configparser.RawConfigParser()
+        config.read('config.ini')
+
+        # Sets introducer
+        if args.introducer:
+            self.introducer_info = args.introducer.split(':')
+        else:
+            self.introducer_info = [config.get("INTRUDUCER",
+                                               "ServerIP",
+                                               fallback="127.0.0.1"),
+                                    config.get("INTRUDUCER",
+                                               "ServerPort",
+                                               fallback="6564")]
+
+        # Sets crypto
+        if args.crypto is not None:
+            self.crypto = args.crypto
+        else:
+            self.crypto = config.get("ARGUMENTS",
+                                     "Crypto",
+                                     fallback="AES")
+
+        # Sets file
+        if args.file is not None:
+            self.file = args.file
+        else:
+            self.file = config.get("ARGUMENTS",
+                                   "File",
+                                   fallback="./test")
+
+        # Sets outputfile
+        if args.output is not None:
+            self.output = args.output
+        else:
+            self.output = config.get("ARGUMENTS",
+                                     "Output",
+                                     fallback="file")
+
+        # Sets password
+        if args.password is not None:
+            self.password = args.password
+        else:
+            self.password = config.get("ARGUMENTS",
+                                       "Password",
+                                       fallback="ChangeMeAlso")
+
+        # Sets log level
+        if args.log is not None:
+            self.log = args.log
+        else:
+            self.log = config.get("ARGUMENTS",
+                                  "LogLevel",
+                                  fallback="0")
+
+        # Sets lanport
+        self.port = config.get("CONNECTION",
+                               "LanPort",
+                               fallback="6668")
+
+        # Prints for test
+        print(self.introducer_info)
+        print(self.crypto)
+        print(self.file)
+        print(self.output)
+        print(self.password)
+        print(self.log)
+        print(self.port)
 
         if args.send:
             print("Call send method in Transfer class")
