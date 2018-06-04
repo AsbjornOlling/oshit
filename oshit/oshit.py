@@ -12,7 +12,7 @@ class oSHIT:
     def __init__(self):
         # internal utilities
         # set temp loglevel, while loading config
-        temploglevel = 2
+        temploglevel = config.Config.default["loglevel"]
         self.logger = logger.Logger(self, temploglevel)
         self.config = config.Config(self)
 

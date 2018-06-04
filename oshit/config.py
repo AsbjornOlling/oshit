@@ -1,128 +1,105 @@
-#!/usr/bin/env python
-
+# library imports
 import argparse
 import configparser
 
 
-class Config:
+class Config(dict):
+    """ Class that reads and holds configuration.
+    Uses argparser to read cli options,
+    and configparser to read from .ini file.
+    Inherits from dict, so config values kan be fetched,
+    with simply Config["key"].
+    """
+    default = {"send": False,
+               "recv": False,
+               "introducer": "127.0.0.1:6564",
+               "file": "./upfile.txt",
+               "output": "./downfile.txt",
+               "crypto": "aes",
+               "password": "ChangeMe",
+               "loglevel": 2
+               }  # defaults must be complete
+
     def __init__(self, oSHIT):
-        # general utility imports
+        # inherit dictionary
+        super(Config, self).__init__(self)
+
+        # utility imports
         self.oSHIT = oSHIT
         self.logger = oSHIT.logger
 
-        # Gets run arguments and generate --help
-        usage = "%(prog)s [--send OR --revc] [-f file] [-c crypto] ..."
-        desc = "A simple UDP Holepunching file Transfer program"
+        # read config from cli and file
+        self.cli = self.read_cli()
+        self.cfile = self.read_configfile("config.ini")
+
+        # combine the three sources
+        self = self.make_dict()
+
+    def read_cli(self):
+        """ Use argparser to read options from command line
+        Also generates --help, and provides interactive logic.
+        """
+        # help info
+        usage = "%(prog)s [--send OR --recv] [-f file] [-c crypto] ..."
+        desc = "A simple UDP holepunching file transfer program"
+
+        # init argparser
         parser = argparse.ArgumentParser(prog="oshit",
                                          usage=usage,
                                          description=desc)
-        group = parser.add_mutually_exclusive_group()
-        group.add_argument("-s",
-                           "--send",
-                           action="store_true")
-        group.add_argument("-r",
-                           "--recv",
-                           action="store_true")
-        parser.add_argument("-c", "--crypto",
-                            type=str,
-                            help="crypto-type")
+
+        # send OR receive
+        sendreceive = parser.add_mutually_exclusive_group()
+        sendreceive.add_argument("-s", "--send",
+                                 action="store_true")
+        sendreceive.add_argument("-r", "--recv",
+                                 action="store_true")
+        # TODO conditionally mandatory
         parser.add_argument("-f", "--file",
-                            type=str,
-                            help="/path/to/file")
+                            type=str, help="/path/to/file")
+        # optional arguments
+        parser.add_argument("-c", "--crypto",
+                            type=str, choices=["aes", "none"])
+
         parser.add_argument("-o", "--output",
-                            type=str,
-                            help="/path/to/outputfile")
-        parser.add_argument("-i",
-                            "--introducer",
-                            type=str,
-                            help="introducer server address")
-        parser.add_argument("-p",
-                            "--password",
-                            type=str,
-                            help="passphrase")
-        parser.add_argument("-l",
-                            "--log",
-                            type=int,
-                            choices=list(range(0, 4)))
-        args = parser.parse_args()
+                            type=str, help="/path/to/outputfile")
 
-        # Read config file if argument isnt set
-        config = configparser.RawConfigParser()
-        config.read('config.ini')
+        parser.add_argument("-i", "--introducer",
+                            type=str, help="introducer server <host:port>")
 
-        # Sets introducer
-        if args.introducer:
-            self.introducer_info = args.introducer.split(':')
-        else:
-            self.introducer_info = [config.get("INTRUDUCER",
-                                               "serverip",
-                                               fallback="127.0.0.1"),
-                                    config.get("INTRUDUCER",
-                                               "serverport",
-                                               fallback="6564")]
+        parser.add_argument("-p", "--password",
+                            type=str, help="password")
 
-        # Sets crypto
-        if args.crypto is not None:
-            self.crypto = args.crypto
-        else:
-            self.crypto = config.get("ARGUMENTS",
-                                     "crypto",
-                                     fallback="AES")
+        parser.add_argument("-l", "--loglevel",
+                            type=int, choices=list(range(0, 4)))
+        # return Namespace obj
+        return parser.parse_args()
 
-        # Sets file
-        if args.file is not None:
-            self.file = args.file
-        else:
-            self.file = config.get("ARGUMENTS",
-                                   "file",
-                                   fallback="./test")
+    def read_configfile(self, cfilepath):
+        """ Read a given config file """
+        cparser = configparser.RawConfigParser()
+        cparser.read(cfilepath)
+        return cparser
 
-        # Sets outputfile
-        if args.output is not None:
-            self.output = args.output
-        else:
-            self.output = config.get("ARGUMENTS",
-                                     "output",
-                                     fallback="file")
+    def make_dict(self):
+        """ Assemble final cofig dict.
+        This method combines sources by priority
+        1. CLI arguments
+        2. Config file
+        3. Defaults dict
+        """
+        optionsdict = {}
+        for option in self.default.keys():
+            # 1: command line args
+            value = getattr(self.cli, option)
 
-        # Sets password
-        if args.password is not None:
-            self.password = args.password
-        else:
-            self.password = config.get("ARGUMENTS",
-                                       "password",
-                                       fallback="ChangeMeAlso")
-
-        # Sets log level
-        if args.log is not None:
-            self.log = args.log
-        else:
-            self.log = config.get("ARGUMENTS",
-                                  "loglevel",
-                                  fallback="0")
-
-        # Sets lanport
-        self.port = config.get("CONNECTION",
-                               "lanport",
-                               fallback="6668")
-
-        # Sets loglevel for logger
-        self.logger.loglevel = self.log
-
-        # Logs
-        self.logger.log(3, "Introducer server set to: " +
-                           self.introducer_info[0] + ":" +
-                           self.introducer_info[1])
-        self.logger.log(3, "Crypto set to: " + self.crypto)
-        self.logger.log(3, "Input file set to: " + self.file)
-        self.logger.log(3, "Output file set to: " + self.output)
-        self.logger.log(3, "Password is set to: " + self.password)
-        self.logger.log(3, "LogLevet is set to: " + str(self.log))
-        self.logger.log(3, "Lokal LAN port is set to: " + str(self.port))
-
-        if args.send:
-            self.logger.log(3, "Call send method in Transfer class")
-        elif args.recv:
-            self.logger.log(3, "Call recive method in Transfer class")
-        else:
-            print("You have to be either sender or reciver")
+            # 2: config file
+            if value is None:
+                value = self.cfile.get("oSHIT", option,
+                                       # 3: defaults
+                                       fallback=self.default[option])
+            # put into dict
+            optionsdict[option] = value
+            self.logger.log(2, "Option " + option
+                            + " set to value: " + str(value))
+        return optionsdict
