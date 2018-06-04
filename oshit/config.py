@@ -7,8 +7,8 @@ class Config(dict):
     """ Class that reads and holds configuration.
     Uses argparser to read cli options,
     and configparser to read from .ini file.
-    Inherits from dict, so config values kan be fetched,
-    with simply Config["key"].
+    Inherits from dict, so config values kan be fetched
+    with a simple: config["key"].
     """
     default = {"send": False,
                "recv": False,
@@ -49,7 +49,6 @@ class Config(dict):
         parser = argparse.ArgumentParser(prog="oshit",
                                          usage=usage,
                                          description=desc)
-
         # send OR receive
         sendreceive = parser.add_mutually_exclusive_group()
         sendreceive.add_argument("-s", "--send",
@@ -117,6 +116,6 @@ class Config(dict):
 
     def check_errors(self, configdict):
         """ Handle impossible configurations """
-        if configdict["send"] == configdict["recv"]:
+        if configdict["send"] == configdict["recv"]:  # NOT XOR
             self.logger.log(0, "Choose either send OR recv")
             quit()
