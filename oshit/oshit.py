@@ -15,8 +15,6 @@ class oSHIT:
         temploglevel = 2
         self.logger = logger.Logger(self, temploglevel)
         self.config = config.Config(self)
-        # now set proper loglevel
-        self.logger.loglevel = self.config.log
 
         self.transport = transport.Transport(self)
         self.crypto = crypto.Crypto(self)

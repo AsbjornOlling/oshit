@@ -8,9 +8,7 @@ class Config:
     def __init__(self, oSHIT):
         # general utility imports
         self.oSHIT = oSHIT
-        self.log = 0
         self.logger = oSHIT.logger
-        self.logger.log(2, "Initializing config object.")
 
         # Gets run arguments and generate --help
         usage = "%(prog)s [--send OR --revc] [-f file] [-c crypto] ..."
@@ -47,6 +45,7 @@ class Config:
                             type=int,
                             choices=list(range(0, 4)))
         args = parser.parse_args()
+        self.logger.loglevel = args.log
 
         # Read config file if argument isnt set
         config = configparser.RawConfigParser()
@@ -109,17 +108,17 @@ class Config:
                                fallback="6668")
 
         # Prints for test
-        self.logger.log(3, self.introducer_info)
-        self.logger.log(3, self.crypto)
-        self.logger.log(3, self.file)
-        self.logger.log(3, self.output)
-        self.logger.log(3, self.password)
-        self.logger.log(3, self.log)
-        self.logger.log(3, self.port)
+        self.logger.log(3, "Introducer server set to: " + self.introducer_info[0] + ":" + self.introducer_info[1])
+        self.logger.log(3, "Crypto set to: " + self.crypto)
+        self.logger.log(3, "Input file set to: " + self.file)
+        self.logger.log(3, "Output file set to: " + self.output)
+        self.logger.log(3, "Password is set to: " + self.password)
+        self.logger.log(3, "LogLevet is set to: " + str(self.log))
+        self.logger.log(3, "Lokal LAN port is set to: " + str(self.port))
 
         if args.send:
             self.logger.log(3, "Call send method in Transfer class")
         elif args.recv:
             self.logger.log(3, "Call recive method in Transfer class")
         else:
-            self.logger.log(3, "You have to be either sender or reciver")
+            print("You have to be either sender or reciver")
