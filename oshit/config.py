@@ -17,7 +17,7 @@ class Config(dict):
                "output": "./downfile.txt",
                "crypto": "aes",
                "password": "ChangeMe",
-               "loglevel": 2
+               "loglevel": 1
                }  # defaults must be complete
 
     def __init__(self, oSHIT):
@@ -31,6 +31,8 @@ class Config(dict):
         # read config from cli and file
         self.cli = self.read_cli()
         self.cfile = self.read_configfile("config.ini")
+
+        self.fix_loglevel()  # quickfix :^)
 
         # combine the three sources
         self = self.make_dict()
@@ -88,7 +90,7 @@ class Config(dict):
         2. Config file
         3. Defaults dict
         """
-        optionsdict = {}
+        configdict = {}
         for option in self.default.keys():
             # 1: command line args
             value = getattr(self.cli, option)
@@ -99,7 +101,22 @@ class Config(dict):
                                        # 3: defaults
                                        fallback=self.default[option])
             # put into dict
-            optionsdict[option] = value
+            configdict[option] = value
             self.logger.log(2, "Option " + option
                             + " set to value: " + str(value))
-        return optionsdict
+        self.check_errors(configdict)  # quick error check
+        return configdict
+
+    def fix_loglevel(self):
+        """ Quickfix for the log level before applying config """
+        clilog = getattr(self.cli, "loglevel")
+        filelog = self.cfile.get("oSHIT", "loglevel", fallback=None)
+        deflog = self.default["loglevel"]
+        newlevel = clilog if clilog else filelog if filelog else deflog
+        self.logger.loglevel = newlevel
+
+    def check_errors(self, configdict):
+        """ Handle impossible configurations """
+        if configdict["send"] == configdict["recv"]:
+            self.logger.log(0, "Choose either send OR recv")
+            quit()
