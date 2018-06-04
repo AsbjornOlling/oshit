@@ -51,10 +51,10 @@ class Config:
             self.introducer_info = args.introducer.split(':')
         else:
             self.introducer_info = [config.get("INTRUDUCER",
-                                               "ServerIP",
+                                               "serverip",
                                                fallback="127.0.0.1"),
                                     config.get("INTRUDUCER",
-                                               "ServerPort",
+                                               "serverport",
                                                fallback="6564")]
 
         # Sets crypto
@@ -62,7 +62,7 @@ class Config:
             self.crypto = args.crypto
         else:
             self.crypto = config.get("ARGUMENTS",
-                                     "Crypto",
+                                     "crypto",
                                      fallback="AES")
 
         # Sets file
@@ -70,7 +70,7 @@ class Config:
             self.file = args.file
         else:
             self.file = config.get("ARGUMENTS",
-                                   "File",
+                                   "file",
                                    fallback="./test")
 
         # Sets outputfile
@@ -78,7 +78,7 @@ class Config:
             self.output = args.output
         else:
             self.output = config.get("ARGUMENTS",
-                                     "Output",
+                                     "output",
                                      fallback="file")
 
         # Sets password
@@ -86,7 +86,7 @@ class Config:
             self.password = args.password
         else:
             self.password = config.get("ARGUMENTS",
-                                       "Password",
+                                       "password",
                                        fallback="ChangeMeAlso")
 
         # Sets log level
@@ -94,12 +94,12 @@ class Config:
             self.log = args.log
         else:
             self.log = config.get("ARGUMENTS",
-                                  "LogLevel",
+                                  "loglevel",
                                   fallback="0")
 
         # Sets lanport
         self.port = config.get("CONNECTION",
-                               "LanPort",
+                               "lanport",
                                fallback="6668")
 
         # Prints for test
