@@ -6,6 +6,12 @@ import configparser
 
 class Config:
     def __init__(self, oSHIT):
+        # general utility imports
+        self.oSHIT = oSHIT
+        self.log = 0
+        self.logger = oSHIT.logger
+        self.logger.log(2, "Initializing config object.")
+
         # Gets run arguments and generate --help
         usage = "%(prog)s [--send OR --revc] [-f file] [-c crypto] ..."
         desc = "A simple UDP Holepunching file Transfer program"
@@ -103,17 +109,17 @@ class Config:
                                fallback="6668")
 
         # Prints for test
-        print(self.introducer_info)
-        print(self.crypto)
-        print(self.file)
-        print(self.output)
-        print(self.password)
-        print(self.log)
-        print(self.port)
+        self.logger.log(3, self.introducer_info)
+        self.logger.log(3, self.crypto)
+        self.logger.log(3, self.file)
+        self.logger.log(3, self.output)
+        self.logger.log(3, self.password)
+        self.logger.log(3, self.log)
+        self.logger.log(3, self.port)
 
         if args.send:
-            print("Call send method in Transfer class")
+            self.logger.log(3, "Call send method in Transfer class")
         elif args.recv:
-            print("Call recive method in Transfer class")
+            self.logger.log(3, "Call recive method in Transfer class")
         else:
-            print("You have to be either sender or reciver")
+            self.logger.log(3, "You have to be either sender or reciver")

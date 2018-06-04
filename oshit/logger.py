@@ -4,7 +4,6 @@
 class Logger():
     def __init__(self, oSHIT, loglevel):
         self.oSHIT = oSHIT
-        self.config = oSHIT.config
 
         self.loglevel = loglevel
 
