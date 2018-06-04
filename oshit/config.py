@@ -45,7 +45,6 @@ class Config:
                             type=int,
                             choices=list(range(0, 4)))
         args = parser.parse_args()
-        self.logger.loglevel = args.log
 
         # Read config file if argument isnt set
         config = configparser.RawConfigParser()
@@ -107,8 +106,13 @@ class Config:
                                "lanport",
                                fallback="6668")
 
-        # Prints for test
-        self.logger.log(3, "Introducer server set to: " + self.introducer_info[0] + ":" + self.introducer_info[1])
+        # Sets loglevel for logger
+        self.logger.loglevel = self.log
+
+        # Logs
+        self.logger.log(3, "Introducer server set to: " +
+                           self.introducer_info[0] + ":" +
+                           self.introducer_info[1])
         self.logger.log(3, "Crypto set to: " + self.crypto)
         self.logger.log(3, "Input file set to: " + self.file)
         self.logger.log(3, "Output file set to: " + self.output)
