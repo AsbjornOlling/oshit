@@ -6,6 +6,12 @@ import configparser
 
 class Config:
     def __init__(self, oSHIT):
+        # general utility imports
+        self.oSHIT = oSHIT
+        self.log = 0
+        self.logger = oSHIT.logger
+        self.logger.log(2, "Initializing config object.")
+
         # Gets run arguments and generate --help
         usage = "%(prog)s [--send OR --revc] [-f file] [-c crypto] ..."
         desc = "A simple UDP Holepunching file Transfer program"
@@ -51,10 +57,10 @@ class Config:
             self.introducer_info = args.introducer.split(':')
         else:
             self.introducer_info = [config.get("INTRUDUCER",
-                                               "ServerIP",
+                                               "serverip",
                                                fallback="127.0.0.1"),
                                     config.get("INTRUDUCER",
-                                               "ServerPort",
+                                               "serverport",
                                                fallback="6564")]
 
         # Sets crypto
@@ -62,7 +68,7 @@ class Config:
             self.crypto = args.crypto
         else:
             self.crypto = config.get("ARGUMENTS",
-                                     "Crypto",
+                                     "crypto",
                                      fallback="AES")
 
         # Sets file
@@ -70,7 +76,7 @@ class Config:
             self.file = args.file
         else:
             self.file = config.get("ARGUMENTS",
-                                   "File",
+                                   "file",
                                    fallback="./test")
 
         # Sets outputfile
@@ -78,7 +84,7 @@ class Config:
             self.output = args.output
         else:
             self.output = config.get("ARGUMENTS",
-                                     "Output",
+                                     "output",
                                      fallback="file")
 
         # Sets password
@@ -86,7 +92,7 @@ class Config:
             self.password = args.password
         else:
             self.password = config.get("ARGUMENTS",
-                                       "Password",
+                                       "password",
                                        fallback="ChangeMeAlso")
 
         # Sets log level
@@ -94,26 +100,26 @@ class Config:
             self.log = args.log
         else:
             self.log = config.get("ARGUMENTS",
-                                  "LogLevel",
+                                  "loglevel",
                                   fallback="0")
 
         # Sets lanport
         self.port = config.get("CONNECTION",
-                               "LanPort",
+                               "lanport",
                                fallback="6668")
 
         # Prints for test
-        print(self.introducer_info)
-        print(self.crypto)
-        print(self.file)
-        print(self.output)
-        print(self.password)
-        print(self.log)
-        print(self.port)
+        self.logger.log(3, self.introducer_info)
+        self.logger.log(3, self.crypto)
+        self.logger.log(3, self.file)
+        self.logger.log(3, self.output)
+        self.logger.log(3, self.password)
+        self.logger.log(3, self.log)
+        self.logger.log(3, self.port)
 
         if args.send:
-            print("Call send method in Transfer class")
+            self.logger.log(3, "Call send method in Transfer class")
         elif args.recv:
-            print("Call recive method in Transfer class")
+            self.logger.log(3, "Call recive method in Transfer class")
         else:
-            print("You have to be either sender or reciver")
+            self.logger.log(3, "You have to be either sender or reciver")

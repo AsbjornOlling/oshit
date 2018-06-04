@@ -11,9 +11,12 @@ import config
 class oSHIT:
     def __init__(self):
         # internal utilities
+        # set temp loglevel, while loading config
+        temploglevel = 2
+        self.logger = logger.Logger(self, temploglevel)
         self.config = config.Config(self)
-        loglevel = 2  # TODO: loglevel in config.py
-        self.logger = logger.Logger(self, loglevel)
+        # now set proper loglevel
+        self.logger.loglevel = self.config.log
 
         self.transport = transport.Transport(self)
         self.crypto = crypto.Crypto(self)
