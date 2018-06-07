@@ -87,3 +87,12 @@ The purpose of the handshake is primarily to exchange keys.
 - **Selective reject** flowcontrol
 - **Window size:** 128 (8 bits in header)
 
+### Buffers / lists
+
+For sending
+- `window` - A list of packets ready to send
+- `txqueue` - A list of packets to be sent
+
+For receiving
+- `rxbuffer` - A buffer for packets arriving out of sequence
+- `lastreceived` - SEQ no of last valid received packet
