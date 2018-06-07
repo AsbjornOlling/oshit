@@ -117,7 +117,7 @@ class Config(collections.MutableMapping):
         filelog = self.cfile.get("oSHIT", "loglevel", fallback=None)
         deflog = self.default["loglevel"]
         newlevel = clilog if clilog else filelog if filelog else deflog
-        self.logger.loglevel = newlevel
+        self.logger.set_loglevel(newlevel)
 
     def check_errors(self, configdict):
         """ Handle impossible configurations """

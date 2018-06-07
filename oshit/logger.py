@@ -1,17 +1,16 @@
 
-## Logger
-# Simple logging utility
 class Logger():
+    """ Logger
+    Simple logging utility
+    """
     def __init__(self, oSHIT, loglevel):
         self.oSHIT = oSHIT
-
-        self.loglevel = loglevel
+        self.set_loglevel(loglevel)
 
         # TODO: add path to logfile to config object
         # when config object is functional
         logfilepath = "log"
         self.logfile = open(logfilepath, 'a')
-
 
     def log(self, loglevel, logstring):
         """ Main logging function. called from everywhere """
@@ -28,3 +27,6 @@ class Logger():
 
             self.logfile.write(logstring + "\n")
             print(output)
+
+    def set_loglevel(self, loglevel):
+        self.loglevel = int(loglevel)
