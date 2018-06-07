@@ -1,9 +1,12 @@
-# library imports
+# standard imports
 import argparse
+import collections  # for abstract base classes
+
+# external imports
 import configparser
 
 
-class Config(dict):
+class Config(collections.MutableMapping):
     """ Class that reads and holds configuration.
     Uses argparser to read cli options,
     and configparser to read from .ini file.
@@ -22,7 +25,9 @@ class Config(dict):
 
     def __init__(self, oSHIT):
         # inherit dictionary
-        super(Config, self).__init__(self)
+        super(Config, self).__init__()
+        self.store = dict()
+        self.update(dict())  # use the free update to set keys
 
         # utility imports
         self.oSHIT = oSHIT
@@ -35,7 +40,7 @@ class Config(dict):
         self.fix_loglevel()  # quickfix :^)
 
         # combine the three sources
-        self = self.make_dict()
+        self.store = self.make_dict()
 
     def read_cli(self):
         """ Use argparser to read options from command line
@@ -119,3 +124,23 @@ class Config(dict):
         if configdict["send"] == configdict["recv"]:  # NOT XOR
             self.logger.log(0, "Choose either send OR recv")
             quit()
+        # TODO check if upfile exists
+
+    # These last methods are only in place to let Config behave as a dict
+    def __getitem__(self, key):
+        return self.store[self.__keytransform__(key)]
+
+    def __setitem__(self, key, value):
+        self.store[self.__keytransform__(key)] = value
+
+    def __delitem__(self, key):
+        del self.store[self.__keytransform__(key)]
+
+    def __iter__(self):
+        return iter(self.store)
+
+    def __len__(self):
+        return len(self.store)
+
+    def __keytransform__(self, key):
+        return key
