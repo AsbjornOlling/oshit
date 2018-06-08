@@ -6,7 +6,7 @@ import threading
 import packet
 
 
-class Transport():
+class Transport:
     """ Implementation of the oSHIT transport protocol
     for tcp-like flow control and error control
     over udp.
@@ -34,19 +34,34 @@ class Transport():
         self.rx = Incoming(transport=self)
         self.tx = Outgoing(transport=self)
 
+        # start
+        # TODO handle closing socket
+        self.open = True
+        threading.Thread(target=self.handle_incoming,
+                         args=(self.rx.rxqueue, self.rx.rxlock))
+
     def create_socket(self):
         """ Create a UDP socket """
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
         sock.bind((self.LOCAL_IP, self.LOCAL_PORT))
         return sock
 
-    def get_timeout(self):
-        # TODO
-        """ Calculates the optimal timeout in milis,
-        based on a moving average of the round trip time so far.
-        Temporarily, it just outputs a constant.
+    def handle_incoming(self, rxqueue, rxlock):
+        """ Processes incoming packet object.
+        Call Selective-Reject logic if ACK or NACK,
+        otherwise pass it on to application logic.
+        This method runs in a thread, which sleeps
+        until the Incoming object updates its rxqueue.
         """
-        return 100
+        # TODO: close when socket closes
+        while True:
+            # take first packet from list
+            if rxqueue:
+                packet = rxqueue.pop(0)  # threadsafe
+                print(type(packet))
+            else:
+                rxlock.acquire()
+                rxlock.wait()  # wait for new item to arrive
 
     def test_write(self):
         # TEST WRITE
@@ -69,6 +84,8 @@ class Incoming(threading.Thread):
 
         # list of packets that transport reads from
         self.rxqueue = []
+        # condition to notify Transport of new Packets in rxqueue
+        self.rxlock = threading.Condition()
 
         # list of current parser threads
         # useful to ensure sequential appending to rxqueue
@@ -88,16 +105,17 @@ class Incoming(threading.Thread):
 
             # make packet obj concurrently
             threading.Thread(target=self.parse,
-                             args=(data, self.rxqueue, self.pthreads)
+                             args=(data,
+                                   self.rxqueue,
+                                   self.rxlock,
+                                   self.pthreads)
                              ).start()
 
     def read(self):
-        """ Reads incoming data from UDP socket.
-        Runs in a threaded loop.
-        """
+        """ Reads one incoming packet from UDP socket. """
         return self.sock.recvfrom(1024)  # TODO evaluate this buffersize
 
-    def parse(self, data, rxqueue, pthreads):
+    def parse(self, data, rxqueue, rxlock, pthreads):
         """ Generate packet objects from raw data.
         Is thread safe, and should cause no concurrency issues.
         """
@@ -112,7 +130,10 @@ class Incoming(threading.Thread):
         for thread in otherthreads:
             thread.join()
         # guaranteed sequential append
+        rxlock.acquire()
         rxqueue.append(pck)
+        rxlock.notify()  # notify transport
+        rxlock.release()
 
 
 class Outgoing(threading.Thread):
