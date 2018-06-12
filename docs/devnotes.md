@@ -4,15 +4,15 @@
 ## Transport
 
 ### TODO:
-x test udp socket by printing incoming data
-? implement packet end detection
+- implement threaded sending and receiving
+- research weather
 - implement packet class
-- dummynet for testing?
+- figure out packet timers
 
 ### Flow control
 
 OBS: modulo af SEQ
-OBS: add to window on ACK
+OBS: add new packets to window on ACK
 OBS: when adding to buffer, check if within window
 OBS: handle holes in buffer when passing buffer to oSHIT
 OBS: better timers in python - callback methods? timers?
@@ -61,3 +61,43 @@ Threaded loop:
 	- append to `txqueue`
 
 
+#### Threading
+
+Only the order they're passed to Transport needs to be sequential
+Transport will always take the first element from a list
+So the list in Incoming needs to be appended sequentially
+
+Example:
+- rxthread receives packet
+- rxthread appends to rxqueue
+- rxthread starts packethandler thread
+- packethandler acquires rxqueue lock
+- packethandler does its shit
+	- maybe passes the packet on to application layer
+- packethandler releases the rxqueue lock
+
+#### Transport architecture
+
+Transport: 
+	- sending window
+	- seq number tracking
+	- works with complete Packet objects
+	In:
+		- reads incoming data
+		- makes packet object
+			- decryption
+			- read seq number
+			- read flags
+			- read payload
+		? passes it up to Transport SOMEHOW
+	Out:
+		- txqueue
+		- sends packet object
+			- 
+
+InPacket(data)
+	- if config['crypto']:
+		self.crypto.decrypt()
+
+OutPacket(data)
+	- created in App layer
