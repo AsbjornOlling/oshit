@@ -18,8 +18,8 @@ class Packet():
     HSIZE = 2     # header: 2 bytes
     PSIZE = 1456  # payload size : 1456 bytes
 
-    def __init__(self, data):
-        pass
+    def __init__(self, data, oSHIT=None):
+        self.logger = oSHIT.logger
 
     def get_bytes(self):
         """ Get unencrypted bytes of entire packet
@@ -28,10 +28,28 @@ class Packet():
         pass
 
     def encrypt(self):
+        # TODO
         pass
 
     def decrypt(self):
+        # TODO
         pass
+
+    def check_fields(self):
+        """ Check fields for invalid states """
+        error = False
+
+        if self.SEQ is None:
+            self.logger.log(0, "Tried to create packet without seqeuence no.")
+            error = True
+
+        if self.ACK and self.NACK:
+            self.logger.log(0, "Tried to create packet with ACK and NACK set.")
+            error = True
+
+        if error:
+            self.logger.log(0, "Quitting because of bad packet error.")
+            quit()
 
 
 class InPacket(Packet):
@@ -55,7 +73,7 @@ class InPacket(Packet):
         # ? checksum
 
     def read_seq(self, header):
-        """ Read sequence number from first byte of header """
+        """ Read sequence number from first byte of header. """
         seq = header[0]
         return seq
 
@@ -78,7 +96,7 @@ class OutPacket(Packet):
     Has the appropriate constructor for encryption, etc.
     Is instantiated in the application layer (oSHIT)
     """
-    def __init__(self, seq=None, ack=False, nack=False, eof=False):
+    def __init__(self, payload, seq=None, ack=False, nack=False, eof=False):
         super(InPacket, self).__init__()
 
         # set header fields
@@ -88,23 +106,7 @@ class OutPacket(Packet):
         self.EOF = eof
         self.check_fields()
 
-        # make header
-        # read payload
-        # ? checksum
-        # encrypt
+        self.payload = payload
 
-    def check_fields(self):
-        """ Check flags for invalid states """
-        error = False
-
-        if self.SEQ is None:
-            self.logger.log(0, "Tried to create packet without seqeuence no.")
-            error = True
-
-        if self.ACK and self.NACK:
-            self.logger.log(0, "Tried to create packet with ACK and NACK set.")
-            error = True
-
-        if error:
-            self.logger.log(0, "Quitting because of bad packet error.")
-            quit()
+        # TODO: encryption
+        # TODO: checksum
