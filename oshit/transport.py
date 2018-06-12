@@ -72,6 +72,8 @@ class Transport:
 
 class Incoming(threading.Thread):
     """ Class to receive and process incoming packets """
+    BSIZE = packet.Packet.HSIZE + packet.Packet.PSIZE  # recv buffersize
+
     def __init__(self, transport=None):
         # run thread constructor
         threading.Thread.__init__(self)
@@ -113,7 +115,8 @@ class Incoming(threading.Thread):
 
     def read(self):
         """ Reads one incoming packet from UDP socket. """
-        return self.sock.recvfrom(1024)  # TODO evaluate this buffersize
+        data, ancdata, msg_flags, address = self.sock.recvmsg(self.BSIZE)
+        return data, address
 
     def parse(self, data, rxqueue, rxlock, pthreads):
         """ Generate packet objects from raw data.
