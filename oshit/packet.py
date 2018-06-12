@@ -1,3 +1,6 @@
+# external imports
+# from bitarray import bitarray
+
 # app imports
 import crypto
 
@@ -12,18 +15,22 @@ class Packet():
     This class should never be used directly, instantiate either
     InPacket or OutPacket.
     """
+    HSIZE = 2     # header: 2 bytes
+    PSIZE = 1456  # payload size : 1456 bytes
+
     def __init__(self, data):
-        # TODO flags
-        self.ACK = False
-        self.NACK = False
-        self.SEQ = 0
-        self.EOF = False
-        self.payload = bytes(1456)
+        pass
 
     def get_bytes(self):
         """ Get unencrypted bytes of entire packet
         Header, payload and all.
         """
+        pass
+
+    def encrypt(self):
+        pass
+
+    def decrypt(self):
         pass
 
 
@@ -34,11 +41,36 @@ class InPacket(Packet):
     """
     def __init__(self, data):
         super(InPacket, self).__init__()
-        # decrypt
+
+        # get header
+        header = data[:self.HSIZE]
         # parse header
-        # read payload
+        self.SEQ = self.read_seq(header)
+        self.ACK, self.NACK, self.EOF = self.read_flags(header)
+
+        # rest of packet is payload
+        self.payload = data[self.HSIZE:]
+
+        # TODO: decryption
         # ? checksum
-        pass
+
+    def read_seq(self, header):
+        """ Read sequence number from first byte of header """
+        seq = header[0]
+        return seq
+
+    def read_flags(self, header):
+        """ Read protocol bit flags from header. """
+        # get flag bits
+        flagbyte = header[1]
+        bitstring = bin(flagbyte)[2:].zfill(8)
+        bitarray = [True if char == '1' else False for char in bitstring]
+
+        # detect flags
+        ack = bitarray[0]
+        nack = bitarray[1]
+        eof = bitarray[2]
+        return (ack, nack, eof)
 
 
 class OutPacket(Packet):
@@ -46,10 +78,33 @@ class OutPacket(Packet):
     Has the appropriate constructor for encryption, etc.
     Is instantiated in the application layer (oSHIT)
     """
-    def __init__(self, data, eof=False):
+    def __init__(self, seq=None, ack=False, nack=False, eof=False):
         super(InPacket, self).__init__()
+
+        # set header fields
+        self.SEQ = seq
+        self.ACK = ack
+        self.NACK = nack
+        self.EOF = eof
+        self.check_fields()
+
         # make header
         # read payload
         # ? checksum
         # encrypt
-        pass
+
+    def check_fields(self):
+        """ Check flags for invalid states """
+        error = False
+
+        if self.SEQ is None:
+            self.logger.log(0, "Tried to create packet without seqeuence no.")
+            error = True
+
+        if self.ACK and self.NACK:
+            self.logger.log(0, "Tried to create packet with ACK and NACK set.")
+            error = True
+
+        if error:
+            self.logger.log(0, "Quitting because of bad packet error.")
+            quit()
