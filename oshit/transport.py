@@ -36,7 +36,6 @@ class Transport:
 
         # start
         # TODO handle closing socket
-        self.open = True
         threading.Thread(target=self.handle_incoming,
                          args=(self.rx.rxqueue, self.rx.rxlock))
 
@@ -59,6 +58,7 @@ class Transport:
             if rxqueue:
                 packet = rxqueue.pop(0)  # threadsafe
                 print(type(packet))
+                # TODO actually do flow shit
             else:
                 rxlock.acquire()
                 rxlock.wait()  # wait for new item to arrive
@@ -145,13 +145,38 @@ class Outgoing(threading.Thread):
         # inherited constructor
         threading.Thread.__init__(self)
 
-        # other app ojbects
+        # inherited objects
         self.parent = transport
         self.oSHIT = transport.oSHIT
-        self.logger = self.oSHIT.logger
+        self.logger = transport.logger
+        self.sock = transport.sock
 
-        # inherited socket
-        self.sock = socket
+        # list of packets that Transport adds to
+        self.txqueue = []
+        # condition for Transport to notify Outgoing of new packets
+        self.txlock = threading.Condition()
+
+        # START SHIT
+        self.start()
+
+    def run(self):
+        """ Thread method """
+        self.write()  # start sending loop
+
+    def write(self, txqueue, txlock):
+        """ Write packets in a loop.
+        Gets notified by Transport when a new packet is added.
+        Also sets transmission time for packets, useful for detecting timeout.
+        """
+        # TODO: handle closing socket
+        while True:
+            if txqueue:  # if list has element
+                pck = txqueue.pop(0)
+                pck.set_txtime()                    # TODO: implement
+                self.sock.sendall(pck.get_bytes())  # TODO: implement
+            else:  # if empty, wait for element to be added
+                txlock.acquire()
+                txlock.wait()
 
 
 if __name__ == '__main__':
