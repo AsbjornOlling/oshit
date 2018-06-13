@@ -1,6 +1,7 @@
 # standard imports
 import argparse
 import collections  # for abstract base classes
+import os
 
 # external imports
 import configparser
@@ -20,7 +21,8 @@ class Config(collections.MutableMapping):
                "output": "./downfile.txt",
                "crypto": "aes",
                "password": "ChangeMe",
-               "loglevel": 1
+               "loglevel": 1,
+               "localport": 1423
                }  # defaults must be complete
 
     def __init__(self, oSHIT):
@@ -78,6 +80,9 @@ class Config(collections.MutableMapping):
 
         parser.add_argument("-l", "--loglevel",
                             type=int, choices=list(range(0, 4)))
+
+        parser.add_argument("-lp", "--localport",
+                            type=int, choices=list(range(1, 65535)))
         # return Namespace obj
         return parser.parse_args()
 
@@ -124,7 +129,13 @@ class Config(collections.MutableMapping):
         if configdict["send"] == configdict["recv"]:  # NOT XOR
             self.logger.log(0, "Choose either send OR recv")
             quit()
-        # TODO check if upfile exists
+        if configdict["send"]:
+            if not os.path.exists(configdict["file"]):
+                self.logger.log(0, "Choose a send file that exists")
+                quit()
+        else:
+            if os.path.exists(configdict["output"]):
+                self.logger.log(0, "Choose a output file that dosn't exists")
 
     # These last methods are only in place to let Config behave as a dict
     def __getitem__(self, key):
