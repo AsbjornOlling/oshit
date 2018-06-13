@@ -3,17 +3,17 @@ import socket
 import threading
 
 # application imports
-from packet import Packet
+import packet
 
 
-class Transport():
+class Transport:
     """ Implementation of the oSHIT transport protocol
     for tcp-like flow control and error control
     over udp.
     """
     WSIZE = 128  # windowsize
 
-    # TODO replace with config
+    # TODO replace with config values
     LOCAL_IP = "127.0.0.1"
     LOCAL_PORT = 9999
 
@@ -25,13 +25,20 @@ class Transport():
 
         # init lists
         self.window = []
-        self.txqueue = []
         self.rxbuffer = []
 
-        # create socket
+        # init socket
         self.sock = self.create_socket()
 
-        # start threading
+        # i/o objs
+        self.rx = Incoming(transport=self)
+        self.tx = Outgoing(transport=self)
+
+        # start
+        # TODO handle closing socket
+        self.open = True
+        threading.Thread(target=self.handle_incoming,
+                         args=(self.rx.rxqueue, self.rx.rxlock))
 
     def create_socket(self):
         """ Create a UDP socket """
@@ -39,58 +46,112 @@ class Transport():
         sock.bind((self.LOCAL_IP, self.LOCAL_PORT))
         return sock
 
-    def get_timeout(self):
-        # TODO
-        """ Calculates the optimal timeout in milis,
-        based on a moving average of the round trip time so far.
-        Temporarily, it just outputs a constant.
+    def handle_incoming(self, rxqueue, rxlock):
+        """ Processes incoming packet object.
+        Call Selective-Reject logic if ACK or NACK,
+        otherwise pass it on to application logic.
+        This method runs in a thread, which sleeps
+        until the Incoming object updates its rxqueue.
         """
-        return 100
-
-    def start_threads(self):
-        """ Creates and starts rxthread and txthread. """
-        self.logger.log(2, "Starting read and write threads")
-        # create threads on methods
-        self.rxthread = threading.Thread(target=self.sock_read)
-        self.txthread = threading.Thread(target=self.sock_write)
-        # start threads
-        self.rxthread.start()
-        self.txthread.start()
-
-    def sock_read(self):
-        """ Reads incoming data from UDP socket.
-        Runs in a threaded loop.
-        """
+        # TODO: close when socket closes
         while True:
-            print("WOW")
-            # data = self.sock.recvfrom(1024)  # TODO evaluate this buffersize
-            # self.handle_incoming(data)
-
-    def sock_write(self):
-        """ Sends any queued packets over UDP.
-        Runs in a threaded loop.
-        """
-        pass
-
-    def handle_incoming(self, data):
-        """ Determines type and appropriate action for incoming packet.
-        It does this by instantiating a Packet object with the relevant
-        data of the incoming packet.
-        """
-        # pck = Packet(data)
-
-    def test_read(self):
-        # TEST READ
-        # TODO
-        self.logger.log(2, "Starting test dataread")
-        msg, addr = self.sock.recvfrom(1024)
-        print(msg)
+            # take first packet from list
+            if rxqueue:
+                packet = rxqueue.pop(0)  # threadsafe
+                print(type(packet))
+            else:
+                rxlock.acquire()
+                rxlock.wait()  # wait for new item to arrive
 
     def test_write(self):
         # TEST WRITE
         self.logger.log(2, "Starting test datawrite")
         self.sock.connect((self.TEST_IP, self.TEST_PORT))
         self.sock.sendall(bytes("wow", "utf-8"))
+
+
+class Incoming(threading.Thread):
+    """ Class to receive and process incoming packets """
+    BSIZE = packet.Packet.HSIZE + packet.Packet.PSIZE  # recv buffersize
+
+    def __init__(self, transport=None):
+        # run thread constructor
+        threading.Thread.__init__(self)
+
+        # inherit objects
+        self.parent = transport
+        self.oSHIT = transport.oSHIT
+        self.logger = self.oSHIT.logger
+        self.sock = transport.sock
+
+        # list of packets that transport reads from
+        self.rxqueue = []
+        # condition to notify Transport of new Packets in rxqueue
+        self.rxlock = threading.Condition()
+
+        # list of current parser threads
+        # useful to ensure sequential appending to rxqueue
+        self.pthreads = []
+
+        # start threadloop
+        # TODO place this elsewhere
+        # TODO handle closing sockets
+        self.reading = True
+        self.start()
+
+    def run(self):
+        """ Thread loop """
+        while self.reading:
+            # get incoming data (blocking)
+            data, addr = self.read()
+
+            # make packet obj concurrently
+            threading.Thread(target=self.parse,
+                             args=(data,
+                                   self.rxqueue,
+                                   self.rxlock,
+                                   self.pthreads)
+                             ).start()
+
+    def read(self):
+        """ Reads one incoming packet from UDP socket. """
+        data, ancdata, msg_flags, address = self.sock.recvmsg(self.BSIZE)
+        return data, address
+
+    def parse(self, data, rxqueue, rxlock, pthreads):
+        """ Generate packet objects from raw data.
+        Is thread safe, and should cause no concurrency issues.
+        """
+        # copy pthreads, to have alist of only other threads
+        otherthreads = pthreads[:]
+        pthreads.append(self)  # add this thread to pthreads
+
+        # parse the data
+        pck = packet.InPacket(data)
+
+        # wait for all previously started threads to complete
+        for thread in otherthreads:
+            thread.join()
+        # guaranteed sequential append
+        rxlock.acquire()
+        rxqueue.append(pck)
+        rxlock.notify()  # notify transport
+        rxlock.release()
+
+
+class Outgoing(threading.Thread):
+    """ Class to process and transmit outgoing packets """
+    def __init__(self, transport=None):
+        # inherited constructor
+        threading.Thread.__init__(self)
+
+        # other app ojbects
+        self.parent = transport
+        self.oSHIT = transport.oSHIT
+        self.logger = self.oSHIT.logger
+
+        # inherited socket
+        self.sock = socket
 
 
 if __name__ == '__main__':
