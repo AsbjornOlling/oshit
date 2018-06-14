@@ -27,6 +27,10 @@ class Packet():
         """
         pass
 
+    def get_payload(self):
+        """ Get the packets payload as bytes object """
+        return self.get_payload
+
     def encrypt(self):
         # TODO
         pass
