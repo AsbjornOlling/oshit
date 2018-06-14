@@ -13,19 +13,23 @@ class Transport:
     """
     WSIZE = 128  # windowsize
 
-    # TODO replace with config values
-    LOCAL_IP = "127.0.0.1"
-    LOCAL_PORT = 9999
-
-    def __init__(self, oSHIT):
+    def __init__(self, CONNECT_ADDR=None, LOCAL_ADDR=None, logic=None):
         # general utility imports
-        self.oSHIT = oSHIT
-        self.config = oSHIT.config
-        self.logger = oSHIT.logger
+        self.logic = logic
+        self.config = logic.config
+        self.logger = logic.logger
+
+        # address to open socket on
+        self.LOCAL_ADDR = LOCAL_ADDR
+        self.LOCAL_IP, self.LOCAL_PORT = LOCAL_ADDR
+        # address to connect to
+        self.CONNECT_ADDR = CONNECT_ADDR
+        self.CONNECT_IP, self.CONNECT_PORT = CONNECT_ADDR
 
         # init lists
-        self.window = []
-        self.rxbuffer = []
+        self.txwindow = []  # packets to transmit
+        self.rxwindow = []  # packets to receive
+        self.rxbuffer = []  # for packets out of order
 
         # init socket
         self.sock = self.create_socket()
@@ -34,15 +38,16 @@ class Transport:
         self.rx = Incoming(transport=self)
         self.tx = Outgoing(transport=self)
 
-        # start
+        # START SHIT
         # TODO handle closing socket
         threading.Thread(target=self.handle_incoming,
                          args=(self.rx.rxqueue, self.rx.rxlock))
+        self.connect(self.CONNECT_ADDR)
 
     def create_socket(self):
         """ Create a UDP socket """
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
-        sock.bind((self.LOCAL_IP, self.LOCAL_PORT))
+        sock.bind(self.LOCAL_ADDR)
         return sock
 
     def handle_incoming(self, rxqueue, rxlock):
@@ -56,12 +61,63 @@ class Transport:
         while True:
             # take first packet from list
             if rxqueue:
-                packet = rxqueue.pop(0)  # threadsafe
-                print(type(packet))
-                # TODO actually do flow shit
+                pck = rxqueue.pop(0)  # threadsafe
+                if pck.ACK:
+                    self.in_ack(pck)
+                elif pck.NACK:
+                    self.in_nack(pck)
+                else:
+                    self.in_payload(pck)
             else:
                 rxlock.acquire()
                 rxlock.wait()  # wait for new item to arrive
+
+    def connect(self, addr):
+        """ Just connect the socket to an (address, port) tuple """
+        self.sock.connect(addr)
+
+    def send(self, pck):
+        """ Send a packet object.
+        To be called by the business logic.
+        """
+        # TODO
+        # add to window
+        pass
+
+    def in_ack(self, ackpck):
+        """ Handle incoming ACK packets.
+        Remove all packets with SEQ less than the ACK's SEQ.
+        (As we know that they're properly received.)
+        """
+        ackseq = ackpck.SEQ
+        for winpck in self.txwindow[:]:  # copy of list to avoid mutation
+            if winpck.SEQ < ackseq:
+                # pass packet on to business logic
+                self.rxwindow.remove(winpck)
+
+    def in_nack(self, nackpck):
+        """ Handle incoming NACK packets.
+        Find packet with the NACK's SEQ, and retransmit it.
+        """
+        nackseq = nackpck.SEQ
+        for winpck in self.txwindow:
+            if winpck.SEQ == nackseq:
+                # re-transmit, cutting the queue
+                self.tx.txqueue.insert(0, winpck)
+
+    def in_payload(self, paypck):
+        """ Handle incoming packet with payload.
+        This is all packets that aren't ACK or NACK.
+        Check if the SEQ is in order, before passing
+        on to application layer logic.
+        """
+        # TODO:
+        # check SEQ:
+        # - is it within window bounds?
+        # - is it the next expected SEQ?
+        # send ACK
+        # update expectedSEQ var
+        # call self.logic.recv_packet()
 
     def test_write(self):
         # TEST WRITE
@@ -161,7 +217,7 @@ class Outgoing(threading.Thread):
 
     def run(self):
         """ Thread method """
-        self.write()  # start sending loop
+        self.write(self.txqueue, self.txlock)  # start sending loop
 
     def write(self, txqueue, txlock):
         """ Write packets in a loop.
