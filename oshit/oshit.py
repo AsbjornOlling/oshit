@@ -2,11 +2,10 @@
 
 import logger
 import transport
-import crypto
-import packet
 import filehandler
 import config
 
+from logic import testlogic
 
 class oSHIT:
     def __init__(self):
@@ -16,9 +15,10 @@ class oSHIT:
         self.logger = logger.Logger(self, temploglevel)
         self.config = config.Config(self)
 
-        self.transport = transport.Transport(self)
-        self.crypto = crypto.Crypto(self)
+        # self.transport = transport.Transport(self)
         # self.filehandler = filehandler.Filehandler(self)
+
+        tl = testlogic.TestReceiveLogic(self, CONNECT_ADDR=("", 1), oSHIT=self)
 
 
 if __name__ == '__main__':
