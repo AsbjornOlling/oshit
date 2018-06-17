@@ -26,21 +26,28 @@ class Transport:
         self.CONNECT_ADDR = CONNECT_ADDR
         self.CONNECT_IP, self.CONNECT_PORT = CONNECT_ADDR
 
-        # init lists
-        self.txwindow = []  # packets to transmit
-        self.rxwindow = []  # packets to receive
-        self.rxbuffer = []  # for packets out of order
+        # init lists and counters
+        # Rx
+        # self.rxwindow = []      # packets to receive TODO remove?
+        self.rxbuffer = []      # for packets out of order
+        self.rxmin = 0
+        self.rxmax = 0
+        # Tx
+        self.txwindow = []      # packets to transmit (keep until ACK'ed)
+        self.lastreceived = -1  # counter for SEQ of last received payload
+        self.txmin = 0          # transmit window bounds
+        self.txmax = self.txmin + self.WSIZE  # TODO: remove these?
 
-        # init socket
+        # start socket
         self.sock = self.create_socket()
 
-        # i/o objs
+        # i/o objs (they manage the socket)
         self.rx = Incoming(transport=self)
         self.tx = Outgoing(transport=self)
 
         # START SHIT
         # TODO handle closing socket
-        threading.Thread(target=self.handle_incoming,
+        threading.Thread(target=self.process_incoming,
                          args=(self.rx.rxqueue, self.rx.rxlock))
         self.connect(self.CONNECT_ADDR)
 
@@ -50,7 +57,19 @@ class Transport:
         sock.bind(self.LOCAL_ADDR)
         return sock
 
-    def handle_incoming(self, rxqueue, rxlock):
+    def connect(self, addr):
+        """ Just connect the socket to an (address, port) tuple """
+        self.sock.connect(addr)
+
+    def send(self, pck):
+        """ Send a packet object.
+        To be called by the business logic.
+        """
+        # TODO
+        # add to window
+        pass
+
+    def process_incoming(self, rxqueue, rxlock):
         """ Processes incoming packet object.
         Call Selective-Reject logic if ACK or NACK,
         otherwise pass it on to application logic.
@@ -72,18 +91,6 @@ class Transport:
                 rxlock.acquire()
                 rxlock.wait()  # wait for new item to arrive
 
-    def connect(self, addr):
-        """ Just connect the socket to an (address, port) tuple """
-        self.sock.connect(addr)
-
-    def send(self, pck):
-        """ Send a packet object.
-        To be called by the business logic.
-        """
-        # TODO
-        # add to window
-        pass
-
     def in_ack(self, ackpck):
         """ Handle incoming ACK packets.
         Remove all packets with SEQ less than the ACK's SEQ.
@@ -92,17 +99,21 @@ class Transport:
         ackseq = ackpck.SEQ
         for winpck in self.txwindow[:]:  # copy of list to avoid mutation
             if winpck.SEQ < ackseq:
-                # pass packet on to business logic
-                self.rxwindow.remove(winpck)
+                # remove accepted packets from window
+                self.txwindow.remove(winpck)
+                self.txmax = self.txmax + 1
+                # TODO: get new OutPacket from logic
 
     def in_nack(self, nackpck):
         """ Handle incoming NACK packets.
         Find packet with the NACK's SEQ, and retransmit it.
         """
         nackseq = nackpck.SEQ
+        self.logger.log(2, "Received NACK: " + str(nackseq)
+                        + ". Re-transmitting.")
         for winpck in self.txwindow:
             if winpck.SEQ == nackseq:
-                # re-transmit, cutting the queue
+                # re-transmit (cut the queue)
                 self.tx.txqueue.insert(0, winpck)
 
     def in_payload(self, paypck):
@@ -112,11 +123,20 @@ class Transport:
         on to application layer logic.
         """
         # TODO:
-        # check SEQ:
         # - is it within window bounds?
-        # - is it the next expected SEQ?
+        #   - LAAAAAaarrss...
+
+        # if the packet is out of order
+        if paypck.SEQ != self.lastreceived + 1:
+            # TODO start the rxbuffer SH!T
+            pass
+
         # send ACK
-        # update expectedSEQ var
+        # self.send_ack(paypck.SEQ + 1)
+
+        # update SEQ count
+        self.lastreceived = paypck.SEQ
+
         # call self.logic.recv_packet()
 
     def test_write(self):
@@ -230,6 +250,7 @@ class Outgoing(threading.Thread):
                 pck = txqueue.pop(0)
                 pck.set_txtime()                    # TODO: implement
                 self.sock.sendall(pck.get_bytes())  # TODO: implement
+                self.parent.txmin = self.parent.txmin + 1
             else:  # if empty, wait for element to be added
                 txlock.acquire()
                 txlock.wait()
