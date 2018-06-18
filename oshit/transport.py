@@ -16,6 +16,7 @@ class Transport:
     def __init__(self, CONNECT_ADDR=None, LOCAL_ADDR=None, logic=None):
         # general utility imports
         self.logic = logic
+        self.oSHIT = logic.oSHIT
         self.config = logic.config
         self.logger = logic.logger
 
@@ -28,7 +29,6 @@ class Transport:
 
         # init lists and counters
         # Rx
-        # self.rxwindow = []      # packets to receive TODO remove?
         self.rxbuffer = []      # for packets out of order
         self.rxmin = 0
         self.rxmax = 0
@@ -47,27 +47,28 @@ class Transport:
 
         # START SHIT
         # TODO handle closing socket
-        threading.Thread(target=self.process_incoming,
-                         args=(self.rx.rxqueue, self.rx.rxlock))
+        # start incoming processor
+        self.logger.log(2, "Starting transport in-processor.")
+        self.proc = threading.Thread(target=self.process_incoming,
+                                     args=(self.rx.rxqueue, self.rx.rxlock),
+                                     name="Transport processor thread")
+        self.proc.start()
+
+        # connect to something
         self.connect(self.CONNECT_ADDR)
 
     def create_socket(self):
         """ Create a UDP socket """
+        self.logger.log(2, "Starting socket")
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # UDP
         sock.bind(self.LOCAL_ADDR)
         return sock
 
     def connect(self, addr):
         """ Just connect the socket to an (address, port) tuple """
+        self.logger.log(2, "Connecting to "
+                        + str(addr[0]) + ":" + str(addr[1]))
         self.sock.connect(addr)
-
-    def send(self, pck):
-        """ Send a packet object.
-        To be called by the business logic.
-        """
-        # TODO
-        # add to window
-        pass
 
     def process_incoming(self, rxqueue, rxlock):
         """ Processes incoming packet object.
@@ -123,21 +124,24 @@ class Transport:
         on to application layer logic.
         """
         # TODO:
-        # - is it within window bounds?
+        # - how to modulo?
+        # - how to calculate window bounds?
         #   - LAAAAAaarrss...
+        #   MODULOOOO
 
         # if the packet is out of order
+        err = False
         if paypck.SEQ != self.lastreceived + 1:
             # TODO start the rxbuffer SH!T
-            pass
+            err = True
+            self.logger.log(0, "Packet arrived out of order, "
+                            + "would be adding to buffer, IMPLEMENT ME pls.")
 
         # send ACK
-        # self.send_ack(paypck.SEQ + 1)
-
-        # update SEQ count
-        self.lastreceived = paypck.SEQ
-
-        # call self.logic.recv_packet()
+        if not err:
+            self.lastreceived = paypck.SEQ      # update SEQ count
+            self.send_ack(paypck.SEQ + 1)       # send the ACK TODO implement
+            self.logic.tr_new_incoming(paypck)  # hand over to Logic
 
     def test_write(self):
         # TEST WRITE
@@ -177,42 +181,53 @@ class Incoming(threading.Thread):
 
     def run(self):
         """ Thread loop """
+        self.logger.log(2, "Starting socket read loop.")
         while self.reading:
-            # get incoming data (blocking)
+            # get data from socket (blocking)
             data, addr = self.read()
 
             # make packet obj concurrently
-            threading.Thread(target=self.parse,
-                             args=(data,
-                                   self.rxqueue,
-                                   self.rxlock,
-                                   self.pthreads)
+            threading.Thread(name="Packet parser thread",
+                             target=self.parse,
+                             args=([data]),
                              ).start()
 
     def read(self):
-        """ Reads one incoming packet from UDP socket. """
+        """ Reads one incoming packet from UDP socket.
+        Buffersize set to the maximum packet size.
+        """
         data, ancdata, msg_flags, address = self.sock.recvmsg(self.BSIZE)
+        self.logger.log(3, "Read data on socket: " + str(type(data)))
         return data, address
 
-    def parse(self, data, rxqueue, rxlock, pthreads):
+    def parse(self, data):
         """ Generate packet objects from raw data.
         Is thread safe, and should cause no concurrency issues.
         """
-        # copy pthreads, to have alist of only other threads
-        otherthreads = pthreads[:]
-        pthreads.append(self)  # add this thread to pthreads
+        self.logger.log(3, "Starting parser thread with data")
+
+        # get list of other active threads
+        otherthreads = self.pthreads[:]
+        self.logger.log(3, "Other active parserthreads: "
+                        + str(len(otherthreads)))
+        # add this thread to the count of threads
+        self.pthreads.append(self)
 
         # parse the data
-        pck = packet.InPacket(data)
+        pck = packet.InPacket(data, oSHIT=self.oSHIT)
+
+        self.logger.log(3, "Packet object created.")
 
         # wait for all previously started threads to complete
         for thread in otherthreads:
             thread.join()
+
         # guaranteed sequential append
-        rxlock.acquire()
-        rxqueue.append(pck)
-        rxlock.notify()  # notify transport
-        rxlock.release()
+        self.logger.log(3, "Data parser thread adding Packet to rxqueue")
+        self.rxlock.acquire()
+        self.rxqueue.append(pck)
+        self.rxlock.notify()  # notify transport
+        self.rxlock.release()
 
 
 class Outgoing(threading.Thread):
@@ -254,9 +269,8 @@ class Outgoing(threading.Thread):
             else:  # if empty, wait for element to be added
                 txlock.acquire()
                 txlock.wait()
+                txlock.release()  # ?
 
 
 if __name__ == '__main__':
-    # JUST DEBUGGAN
-    import oshit
-    t = Transport(oshit.oSHIT())
+    pass
