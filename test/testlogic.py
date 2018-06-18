@@ -1,10 +1,10 @@
 import sys
 sys.path.insert(0, '../oshit')
 
-from transport import Transport
-from packet import Packet
-from logic import Logic
 from oshit import oSHIT
+from logic import Logic
+from transport import Transport
+from filehandler import FileHandler
 
 
 class TestLogic(Logic):
@@ -19,26 +19,31 @@ class TestLogic(Logic):
         self.logger = oSHIT.logger
         self.logger.log(1, "Test logic running!")
 
+        # open file
+
         # connect to peer
         self.transp = self.connect()
 
     def connect(self):
         return Transport(CONNECT_ADDR=self.CONNECT_ADDR,
-                         LOCAL_ADDR=("0.0.0.0", 6666),
+                         LOCAL_ADDR=("127.0.0.1", 6666),
                          logic=self)
 
     def handle_incoming(self, pck):
-        """ Mandatory logic method. Handles incoming packets.
+        """ Mandatory Logic method. Handles incoming packets.
         This one just prints the payload.
         """
+        packstring = "\t\t### TEST PACKET INFO ###\n"
+        packstring += "\t\tSEQ: " + str(pck.SEQ) + "\n"
         payload = pck.get_payload()
-        print("PAYLOAD: " + str(payload))
+        packstring += "\t\tPAYLOAD: " + str(payload)
+        print(packstring)
 
     def get_next_packet(self):
         self.logger.log(1, "Logic is being asked for new packet.")
-        pass
+        return None
 
 
 if __name__ == '__main__':
     app = oSHIT()
-    tester = TestLogic(CONNECT_ADDR=("127.0.0.1", 5555), oSHIT=app)
+    logic = TestLogic(CONNECT_ADDR=("127.0.0.1", 5555), oSHIT=app)

@@ -31,12 +31,12 @@ class Transport:
         # Rx
         self.rxbuffer = []      # for packets out of order
         self.rxmin = 0
-        self.rxmax = 0
+        self.rxmax = self.rxmin + self.WSIZE
         # Tx
         self.txwindow = []      # packets to transmit (keep until ACK'ed)
         self.lastreceived = -1  # counter for SEQ of last received payload
-        self.txmin = 0          # transmit window bounds
-        self.txmax = self.txmin + self.WSIZE  # TODO: remove these?
+        self.txmin = 0          # transmission window bounds
+        self.txmax = self.txmin + self.WSIZE  # default bounds = [0, 128[
 
         # start socket
         self.sock = self.create_socket()
@@ -102,8 +102,8 @@ class Transport:
             if winpck.SEQ < ackseq:
                 # remove accepted packets from window
                 self.txwindow.remove(winpck)
-                self.txmax = self.txmax + 1
-                # TODO: get new OutPacket from logic
+                self.txmax = (self.txmax + 1) % 256
+                # TODO: get new OutPacket from Logic
 
     def in_nack(self, nackpck):
         """ Handle incoming NACK packets.
@@ -123,31 +123,62 @@ class Transport:
         Check if the SEQ is in order, before passing
         on to application layer logic.
         """
+        err = False
         # TODO:
-        # - how to modulo?
-        # - how to calculate window bounds?
-        #   - LAAAAAaarrss...
-        #   MODULOOOO
+        # implement resizing rxbounds
+
+        # test window bounds
+        if not self.check_rxbounds(paypck):
+            # error logging for this in self.check_rxbounds
+            err = True
 
         # if the packet is out of order
-        err = False
-        if paypck.SEQ != self.lastreceived + 1:
-            # TODO start the rxbuffer SH!T
+        if (paypck.SEQ != (self.lastreceived + 1) % 256
+           and not err):
             err = True
             self.logger.log(0, "Packet arrived out of order, "
                             + "would be adding to buffer, IMPLEMENT ME pls.")
+            # TODO
+            # redirect packet to rxbuffer
+            # have logic to empty rxbuffer
 
-        # send ACK
+        # if valid packet
         if not err:
-            self.lastreceived = paypck.SEQ      # update SEQ count
-            self.send_ack(paypck.SEQ + 1)       # send the ACK TODO implement
+            # update rxbounds
+            self.rxmin = (self.rxmin + 1) % 256
+
+            # update SEQ count (will always be in 0-255)
+            self.lastreceived = paypck.SEQ
+
+            # send the Ack
+            self.logger.log(3, "TODO: Send ACK!")
+
+            # self.send_ack(paypck.SEQ + 1)       # send the ACK TODO implement
+            self.rxmax = (self.rxmax + 1) % 256
+
             self.logic.tr_new_incoming(paypck)  # hand over to Logic
 
-    def test_write(self):
-        # TEST WRITE
-        self.logger.log(2, "Starting test datawrite")
-        self.sock.connect((self.TEST_IP, self.TEST_PORT))
-        self.sock.sendall(bytes("wow", "utf-8"))
+    def check_rxbounds(self, pck):
+        """ Check if InPacket is within rx window bounds.
+        Also handles cases where rxmax has "rolled over" to be less than rxmin.
+        """
+        seq = pck.SEQ
+        withinbounds = False  # assume false until determined
+        if self.rxmin < self.rxmax:
+            if self.rxmin <= seq and seq < self.rxmax:
+                withinbounds = True
+        elif self.rxmax < self.rxmin:  # weird roll-over edgecase
+            if seq < self.rxmax or seq >= self.rxmin:
+                withinbounds = True
+
+        # if packet outside bounds
+        if not withinbounds:
+            self.logger.log(0, "Packet with SEQ " + str(seq)
+                            + " is outside window bounds: " + "[" +
+                               str(self.rxmin) + ":" + str(self.rxmax)
+                            + "[")
+        # return bounds state
+        return withinbounds
 
 
 class Incoming(threading.Thread):
@@ -187,10 +218,12 @@ class Incoming(threading.Thread):
             data, addr = self.read()
 
             # make packet obj concurrently
-            threading.Thread(name="Packet parser thread",
-                             target=self.parse,
-                             args=([data]),
-                             ).start()
+            parserthread = threading.Thread(name="Packet parser thread",
+                                            target=self.parse,
+                                            args=([data], self.pthreads),
+                                            )
+            parserthread.start()
+            self.pthreads.append(parserthread)
 
     def read(self):
         """ Reads one incoming packet from UDP socket.
@@ -200,18 +233,14 @@ class Incoming(threading.Thread):
         self.logger.log(3, "Read data on socket: " + str(type(data)))
         return data, address
 
-    def parse(self, data):
+    def parse(self, data, threads):
         """ Generate packet objects from raw data.
         Is thread safe, and should cause no concurrency issues.
         """
-        self.logger.log(3, "Starting parser thread with data")
-
         # get list of other active threads
-        otherthreads = self.pthreads[:]
+        otherthreads = threads[:]
         self.logger.log(3, "Other active parserthreads: "
                         + str(len(otherthreads)))
-        # add this thread to the count of threads
-        self.pthreads.append(self)
 
         # parse the data
         pck = packet.InPacket(data, oSHIT=self.oSHIT)
@@ -228,6 +257,7 @@ class Incoming(threading.Thread):
         self.rxqueue.append(pck)
         self.rxlock.notify()  # notify transport
         self.rxlock.release()
+        self.logger.log(3, "RIP Data parser thread")
 
 
 class Outgoing(threading.Thread):
@@ -265,7 +295,7 @@ class Outgoing(threading.Thread):
                 pck = txqueue.pop(0)
                 pck.set_txtime()                    # TODO: implement
                 self.sock.sendall(pck.get_bytes())  # TODO: implement
-                self.parent.txmin = self.parent.txmin + 1
+                self.parent.txmin = (self.parent.txmin + 1) % 256
             else:  # if empty, wait for element to be added
                 txlock.acquire()
                 txlock.wait()
