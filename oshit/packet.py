@@ -136,6 +136,6 @@ class OutPacket(Packet):
         seq = self.SEQ
         flags = 0
         flags += self.ACK << 7   # first bit
-        flags += self.NACK << 7  # second bit
-        flags += self.EOF << 5   # second bit
-        return bytes(seq) + bytes(flags)
+        flags += self.NACK << 6  # second bit
+        flags += self.EOF << 5   # third bit
+        return bytes([seq]) + bytes([flags])
