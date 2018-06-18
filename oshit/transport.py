@@ -47,12 +47,8 @@ class Transport:
 
         # START SHIT
         # TODO handle closing socket
-        # start incoming processor
-        self.logger.log(2, "Starting transport in-processor.")
-        self.proc = threading.Thread(target=self.process_incoming,
-                                     args=(self.rx.rxqueue, self.rx.rxlock),
-                                     name="Transport processor thread")
-        self.proc.start()
+        # Start InPacket processor thread
+        self.proc = self.start_processorthread()
 
         # connect to something
         self.connect(self.CONNECT_ADDR)
@@ -69,6 +65,18 @@ class Transport:
         self.logger.log(2, "Connecting to "
                         + str(addr[0]) + ":" + str(addr[1]))
         self.sock.connect(addr)
+
+    def start_processorthread(self):
+        """ Starts thread on self.process_incoming()
+        The thread reads InPackets from rxqueue,
+        and is woken by Incoming when new packets arrive.
+        """
+        self.logger.log(3, "Starting transport in-processor.")
+        proc = threading.Thread(target=self.process_incoming,
+                                args=(self.rx.rxqueue, self.rx.rxlock),
+                                name="Transport processor thread")
+        proc.start()
+        return proc
 
     def process_incoming(self, rxqueue, rxlock):
         """ Processes incoming packet object (InPacket).
@@ -103,7 +111,7 @@ class Transport:
                 # remove accepted packets from window
                 self.txwindow.remove(winpck)
                 self.txmax = (self.txmax + 1) % 256
-                # TODO: get new OutPacket from Logic
+                # TODO: notify OutLogic of packetspace
 
     def in_nack(self, nackpck):
         """ Handle incoming NACK packets.
@@ -143,9 +151,9 @@ class Transport:
             # TODO
             # have logic to empty rxbuffer
 
-        # if valid packet
+        # if packet passed checks
         if not err:
-            self.in_validpack(paypck)
+            self.in_validpack(paypck, sendack=True)
 
     def check_rxbounds(self, pck):
         """ Check if InPacket is within rx window bounds.
@@ -163,9 +171,9 @@ class Transport:
         # if packet outside bounds
         if not withinbounds:
             self.logger.log(0, "Packet with SEQ " + str(seq)
-                            + " is outside window bounds: " + "["
-                            + str(self.rxmin) + ":" + str(self.rxmax)
-                            + "[")
+                            + " is outside window bounds: "
+                            + "[" + str(self.rxmin)
+                            + ":" + str(self.rxmax) + "[")
         # return bounds state
         return withinbounds
 
@@ -186,8 +194,8 @@ class Transport:
 
         # send the Ack
         if sendack:
-            self.logger.log(3, "TODO: Send ACK!")
-            # self.send_ack(paypck.SEQ + 1)  # TODO implement
+            self.logger.log(3, "Calling send_ack()")
+            self.send_ack(pck.SEQ + 1)  # TODO test
 
     def in_unordered(self, pck):
         """ Handle packet arriving out of order.
@@ -195,6 +203,13 @@ class Transport:
         and check if the next expected packet has come to self.rxbuffer yet.
         This is the only method that interacts with self.rxbuffer.
         """
+        self.logger.log(3, "Bufferring packet with SEQ: " + str(pck.SEQ))
+
+        if not self.rxbuffer:
+            self.logger.log(3, "rxbuffer was empty. Adding first packet.")
+            self.rxbuffer.append(pck)
+
+        # TODO: consider re-working this insertion algorithm
         precedingseq = (pck.SEQ - 1) % 256
         succeedingseq = (pck.SEQ + 1) % 256
         inserted = False
@@ -211,10 +226,34 @@ class Transport:
                 inserted = True
 
             if inserted:
+                self.logger.log(3, "Inserting at specific position in buffer.")
                 break
 
+        # if neither the preceeding or succeeding packet is found
+        # just add the packet
         if not inserted:
-            self.rxbuffer.append()
+            self.logger.log(0, "Could not find appropriate spot in rxbuffer!")
+
+        # start emptying buffer if the missing packet is in the buffer
+        while self.rxbuffer[0].SEQ == self.lastreceived + 1:
+            # take the missing packet out of the buffer
+            validpck = self.rxbuffer.pop(0)
+            # don't send ACK if the next packet is still in order
+            sendack = self.rxbuffer[0].SEQ != self.lastreceived + 2
+            self.in_validpack(validpck, sendack=sendack)
+
+    def send_ack(self, seq):
+        """ Queues ACK packet with the argument as SEQ for sending. """
+        # create ACK packet with empty payload
+        ackpck = packet.OutPacket(bytes(0), oSHIT=self.oSHIT,
+                                  seq=seq, ack=True)
+
+        # notify Outgoing thread, and queue the ACK packet
+        self.logger.log(3, "Sending ACK: " + str(ackpck.SEQ))
+        self.tx.txlock.acquire()
+        self.tx.txqueue.append(ackpck)
+        self.tx.txlock.notify()
+        self.tx.txlock.release()
 
 
 class Incoming(threading.Thread):

@@ -18,7 +18,7 @@ class Packet():
     HSIZE = 2     # header: 2 bytes
     PSIZE = 1456  # payload size : 1456 bytes
 
-    def __init__(self, data, oSHIT=None):
+    def __init__(self, oSHIT=None):
         self.logger = oSHIT.logger
 
     def get_bytes(self):
@@ -29,7 +29,7 @@ class Packet():
 
     def get_payload(self):
         """ Get the packets payload as bytes object """
-        return self.get_payload
+        return self.payload
 
     def encrypt(self):
         # TODO
@@ -61,17 +61,21 @@ class InPacket(Packet):
     Has the appropriate constructor for decryption etc.
     Is instantiated in transport.rx.
     """
-    def __init__(self, data):
-        super(InPacket, self).__init__()
+    def __init__(self, data, oSHIT=None):
+        super(InPacket, self).__init__(oSHIT=oSHIT)
 
-        # get header
-        header = data[:self.HSIZE]
+        # split data
+        self.header = data[0][:self.HSIZE]
+        self.payload = data[0][self.HSIZE:]
+        self.logger.log(3, "Got header: "
+                        + str(int(len(self.header))) + str(type(self.header))
+                        + " and payload: "
+                        + str(int(len(self.payload)))
+                        + str(type(self.payload)))
+
         # parse header
-        self.SEQ = self.read_seq(header)
-        self.ACK, self.NACK, self.EOF = self.read_flags(header)
-
-        # rest of packet is payload
-        self.payload = data[self.HSIZE:]
+        self.SEQ = self.read_seq(self.header)
+        self.ACK, self.NACK, self.EOF = self.read_flags(self.header)
 
         # TODO: decryption
         # ? checksum
@@ -100,8 +104,10 @@ class OutPacket(Packet):
     Has the appropriate constructor for encryption, etc.
     Is instantiated in the application layer (oSHIT)
     """
-    def __init__(self, payload, seq=None, ack=False, nack=False, eof=False):
-        super(InPacket, self).__init__()
+    def __init__(self, payload,
+                 seq=None, ack=False, nack=False, eof=False,
+                 oSHIT=None):
+        super(OutPacket, self).__init__(oSHIT=oSHIT)
 
         # set header fields
         self.SEQ = seq
