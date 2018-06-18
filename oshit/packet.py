@@ -25,7 +25,10 @@ class Packet():
         """ Get unencrypted bytes of entire packet
         Header, payload and all.
         """
-        pass
+        allbytes = self.header
+        # concatenate payload if set
+        allbytes += self.payload if self.payload else b''
+        return allbytes
 
     def get_payload(self):
         """ Get the packets payload as bytes object """
@@ -104,9 +107,8 @@ class OutPacket(Packet):
     Has the appropriate constructor for encryption, etc.
     Is instantiated in the application layer (oSHIT)
     """
-    def __init__(self, payload,
-                 seq=None, ack=False, nack=False, eof=False,
-                 oSHIT=None):
+    def __init__(self, payload=None, oSHIT=None,
+                 seq=None, ack=False, nack=False, eof=False):
         super(OutPacket, self).__init__(oSHIT=oSHIT)
 
         # set header fields
@@ -116,7 +118,24 @@ class OutPacket(Packet):
         self.EOF = eof
         self.check_fields()
 
+        # set header and payload
+        self.header = self.construct_header()
         self.payload = payload
+
+        self.logger.log(3, "Outgoing packet:\n"
+                        + "\tLength: \t" + str(len(self.header)) + "\n"
+                        + "\tSEQ: \t" + str(self.header[:8]) + "\n"
+                        + "\tFlags: \t" + str(self.header[8:]) + "\n"
+                        + "\tPayload: \t" + str(type(self.payload)))
 
         # TODO: encryption
         # TODO: checksum
+
+    def construct_header(self):
+        """ Return header bytes object based on class field."""
+        seq = self.SEQ
+        flags = 0
+        flags += self.ACK << 7   # first bit
+        flags += self.NACK << 7  # second bit
+        flags += self.EOF << 5   # second bit
+        return bytes(seq) + bytes(flags)
