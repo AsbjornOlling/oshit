@@ -242,8 +242,10 @@ class Transport:
             sendack = self.rxbuffer[0].SEQ != self.lastreceived + 2
             self.in_validpack(validpck, sendack=sendack)
 
-    def send_ack(self, seq):
-        """ Queues ACK packet with the argument as SEQ for sending. """
+    def send_ack(self, seq, nack=False):
+        """ Queues ACK packet with the argument as SEQ for sending.
+        Sends nack instead, if nack=True option is set.
+        """
         # create ACK packet with empty payload
         ackpck = packet.OutPacket(bytes(0), oSHIT=self.oSHIT,
                                   seq=seq, ack=True)
@@ -295,8 +297,7 @@ class Incoming(threading.Thread):
             # make packet obj concurrently
             parserthread = threading.Thread(name="Packet parser thread",
                                             target=self.parse,
-                                            args=([data], self.pthreads),
-                                            )
+                                            args=([data], self.pthreads))
             parserthread.start()
             self.pthreads.append(parserthread)
 
@@ -332,7 +333,7 @@ class Incoming(threading.Thread):
         self.rxqueue.append(pck)
         self.rxlock.notify()  # notify transport
         self.rxlock.release()
-        self.logger.log(3, "RIP Data parser thread")
+        self.logger.log(3, "Terminating data parser thread")
 
 
 class Outgoing(threading.Thread):
