@@ -124,8 +124,8 @@ class OutPacket(Packet):
 
         self.logger.log(3, "Outgoing packet:\n"
                         + "\tLength: \t" + str(len(self.header)) + "\n"
-                        + "\tSEQ: \t" + str(self.header[:8]) + "\n"
-                        + "\tFlags: \t" + str(self.header[8:]) + "\n"
+                        + "\tSEQ: \t\t" + str(self.header[0]) + "\n"
+                        + "\tFlags: \t\t" + str(bin(self.header[1])) + "\n"
                         + "\tPayload: \t" + str(type(self.payload)))
 
         # TODO: encryption
