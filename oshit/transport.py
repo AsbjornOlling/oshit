@@ -11,7 +11,7 @@ class Transport:
     for tcp-like flow control and error control
     over udp.
     """
-    WSIZE = 128  # windowsize
+    WSIZE = 128  # MAX windowsize
 
     def __init__(self, CONNECT_ADDR=None, LOCAL_ADDR=None, logic=None):
         # general utility imports
@@ -71,7 +71,7 @@ class Transport:
         self.sock.connect(addr)
 
     def process_incoming(self, rxqueue, rxlock):
-        """ Processes incoming packet object.
+        """ Processes incoming packet object (InPacket).
         Call Selective-Reject logic if ACK or NACK,
         otherwise pass it on to application logic.
         This method runs in a thread, which sleeps
@@ -138,25 +138,14 @@ class Transport:
             err = True
             self.logger.log(0, "Packet arrived out of order, "
                             + "would be adding to buffer, IMPLEMENT ME pls.")
-            # TODO
             # redirect packet to rxbuffer
+            self.in_unordered(paypck)
+            # TODO
             # have logic to empty rxbuffer
 
         # if valid packet
         if not err:
-            # update rxbounds
-            self.rxmin = (self.rxmin + 1) % 256
-
-            # update SEQ count (will always be in 0-255)
-            self.lastreceived = paypck.SEQ
-
-            # send the Ack
-            self.logger.log(3, "TODO: Send ACK!")
-
-            # self.send_ack(paypck.SEQ + 1)       # send the ACK TODO implement
-            self.rxmax = (self.rxmax + 1) % 256
-
-            self.logic.tr_new_incoming(paypck)  # hand over to Logic
+            self.in_validpack(paypck)
 
     def check_rxbounds(self, pck):
         """ Check if InPacket is within rx window bounds.
@@ -174,11 +163,58 @@ class Transport:
         # if packet outside bounds
         if not withinbounds:
             self.logger.log(0, "Packet with SEQ " + str(seq)
-                            + " is outside window bounds: " + "[" +
-                               str(self.rxmin) + ":" + str(self.rxmax)
+                            + " is outside window bounds: " + "["
+                            + str(self.rxmin) + ":" + str(self.rxmax)
                             + "[")
         # return bounds state
         return withinbounds
+
+    def in_validpack(self, pck, sendack=False):
+        """ Pass packet on to logic module.
+        Is called if incoming packet is the next expected packet
+        and incoming packet is within rx window bounds.
+        """
+        # update rxbounds
+        self.rxmin = (self.rxmin + 1) % 256
+        self.rxmax = (self.rxmax + 1) % 256  # TODO Laarss... why after ack
+
+        # update SEQ count (will always be in 0-255)
+        self.lastreceived = pck.SEQ
+
+        # hand over to Logic
+        self.logic.tr_new_incoming(pck)
+
+        # send the Ack
+        if sendack:
+            self.logger.log(3, "TODO: Send ACK!")
+            # self.send_ack(paypck.SEQ + 1)  # TODO implement
+
+    def in_unordered(self, pck):
+        """ Handle packet arriving out of order.
+        Add the packet in the correct position of self.rxbuffer,
+        and check if the next expected packet has come to self.rxbuffer yet.
+        This is the only method that interacts with self.rxbuffer.
+        """
+        precedingseq = (pck.SEQ - 1) % 256
+        succeedingseq = (pck.SEQ + 1) % 256
+        inserted = False
+        for bufpck in self.rxbuffer:
+            # if the packet in buffer is the succeeding packet
+            # add the new packet before the packet in buffer
+            if bufpck.SEQ == succeedingseq:
+                self.rxbuffer.insert(self.rxbuffer.index(bufpck), pck)
+                inserted = True
+            # if the packet in buffer has the preceding SEQ
+            # add the new packet after the packet in buffer
+            elif bufpck.SEQ == precedingseq:
+                self.rxbuffer.insert(self.rxbuffer.index(bufpck) + 1, pck)
+                inserted = True
+
+            if inserted:
+                break
+
+        if not inserted:
+            self.rxbuffer.append()
 
 
 class Incoming(threading.Thread):
