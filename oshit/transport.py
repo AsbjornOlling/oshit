@@ -192,9 +192,8 @@ class Transport:
         # hand over to Logic
         self.logic.tr_new_incoming(pck)
 
-        # send the Ack
+        # send the ACK
         if sendack:
-            self.logger.log(3, "Calling send_ack()")
             self.send_ack(pck.SEQ + 1)  # TODO test
 
     def in_unordered(self, pck):
@@ -246,12 +245,19 @@ class Transport:
         """ Queues ACK packet with the argument as SEQ for sending.
         Sends nack instead, if nack=True option is set.
         """
+        # don't ACK if NACK is set
+        ack = False if nack else True
+
+        if ack:
+            self.logger.log(3, "Sending ACK: " + str(seq))
+        if nack:
+            self.logger.log(3, "Sending NACK: " + str(seq))
+
         # create ACK packet with empty payload
-        ackpck = packet.OutPacket(bytes(0), oSHIT=self.oSHIT,
-                                  seq=seq, ack=True)
+        ackpck = packet.OutPacket(seq=seq, ack=ack, nack=nack,
+                                  oSHIT=self.oSHIT)
 
         # notify Outgoing thread, and queue the ACK packet
-        self.logger.log(3, "Sending ACK: " + str(ackpck.SEQ))
         self.tx.txlock.acquire()
         self.tx.txqueue.append(ackpck)
         self.tx.txlock.notify()
@@ -340,7 +346,7 @@ class Outgoing(threading.Thread):
     """ Class to process and transmit outgoing packets """
     def __init__(self, transport=None):
         # inherited constructor
-        threading.Thread.__init__(self)
+        threading.Thread.__init__(self, name="Sender thread")
 
         # inherited objects
         self.parent = transport
@@ -369,7 +375,7 @@ class Outgoing(threading.Thread):
         while True:
             if txqueue:  # if list has element
                 pck = txqueue.pop(0)
-                pck.set_txtime()                    # TODO: implement
+                # pck.set_txtime()                  # TODO: implement
                 self.sock.sendall(pck.get_bytes())  # TODO: implement
                 self.parent.txmin = (self.parent.txmin + 1) % 256
             else:  # if empty, wait for element to be added
