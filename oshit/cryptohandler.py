@@ -56,7 +56,9 @@ class CryptoHandler:
         Uses the aeskey field in the counstructor to encrypt.
         """
         aes_cipher = AES.new(self.aeskey)
-        encrypted_data = aes_cipher.encrypt(data)
+        # Padding data with zeros for AES
+        padded_data = data + bytes(16 - (len(data) % 16))
+        encrypted_data = aes_cipher.encrypt(padded_data)
         return encrypted_data
 
     def aes_decrypt(self, data):
