@@ -22,6 +22,7 @@ class Config(collections.MutableMapping):
                "crypto": "aes",
                "password": "ChangeMe",
                "loglevel": 1,
+               "logfile": "./log",
                "localport": 1423
                }  # defaults must be complete
 
@@ -43,6 +44,10 @@ class Config(collections.MutableMapping):
 
         # combine the three sources
         self.store = self.make_dict()
+
+        # quickfix :^)
+        # setting logfile
+        self.logger.open_logfile(self.store["logfile"])
 
     def read_cli(self):
         """ Use argparser to read options from command line
@@ -82,6 +87,9 @@ class Config(collections.MutableMapping):
                             type=int, choices=list(range(0, 4)),
                             help="Choose a loglevel between 1 and 3",
                             metavar='[0,3]')
+
+        parser.add_argument("-lf", "--logfile",
+                            type=str, help="path to store logs in")
 
         parser.add_argument("-lp", "--localport",
                             type=int, choices=list(range(1, 65535)),

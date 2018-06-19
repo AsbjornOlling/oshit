@@ -6,11 +6,7 @@ class Logger():
     def __init__(self, oSHIT, loglevel):
         self.oSHIT = oSHIT
         self.set_loglevel(loglevel)
-
-        # TODO: add path to logfile to config object
-        # when config object is functional
-        logfilepath = "log"
-        self.logfile = open(logfilepath, 'a')
+        self.logfile = None
 
     def log(self, loglevel, logstring):
         """ Main logging function. called from everywhere """
@@ -25,8 +21,12 @@ class Logger():
             elif loglevel == 3:
                 output = "[WTF] " + logstring
 
-            self.logfile.write(logstring + "\n")
+            if self.logfile:
+                self.logfile.write(logstring + "\n")
             print(output)
 
     def set_loglevel(self, loglevel):
         self.loglevel = int(loglevel)
+
+    def open_logfile(self, logfilepath):
+        self.logfile = open(logfilepath, 'a')
