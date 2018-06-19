@@ -34,14 +34,16 @@ def hello_world(sock):
 
 
 def swapped_packets(sock):
-    for i in range(5):
+    # send dumb packets
+    # swap packets three and four
+    for i in range(10):
         if i == 3:
             i = 4
         elif i == 4:
             i = 3
         header = bytes([i, 0])
         print("Sending: " + str(i))
-        payload = bytes("Swap packets test." + "\n", "utf-8")
+        payload = bytes("Swap packets test: " + str(i) + "\n", "utf-8")
         sock.sendall(header + payload)
 
 

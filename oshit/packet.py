@@ -2,7 +2,7 @@
 # from bitarray import bitarray
 
 # app imports
-import crypto
+# import cryptohandler
 
 # XXX: None of this is actually implemented properly
 # treat this whole thing as a shitty skeleton of good things to come
@@ -45,7 +45,6 @@ class Packet():
     def check_fields(self):
         """ Check fields for invalid states """
         error = False
-
         if self.SEQ is None:
             self.logger.log(0, "Tried to create packet without seqeuence no.")
             error = True
