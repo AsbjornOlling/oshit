@@ -19,6 +19,7 @@ class Packet():
     PSIZE = 1456  # payload size : 1456 bytes
 
     def __init__(self, oSHIT=None):
+        self.oSHIT = oSHIT
         self.logger = oSHIT.logger
 
     def get_bytes(self):
@@ -45,10 +46,6 @@ class Packet():
     def check_fields(self):
         """ Check fields for invalid states """
         error = False
-        if self.SEQ is None:
-            self.logger.log(0, "Tried to create packet without seqeuence no.")
-            error = True
-
         if self.ACK and self.NACK:
             self.logger.log(0, "Tried to create packet with ACK and NACK set.")
             error = True
@@ -106,8 +103,11 @@ class OutPacket(Packet):
     Has the appropriate constructor for encryption, etc.
     Is instantiated in the application layer (oSHIT)
     """
-    def __init__(self, payload=None, oSHIT=None,
-                 seq=None, ack=False, nack=False, eof=False):
+    def __init__(self, payload=None,
+                 seq=None, ack=False, nack=False, eof=False,
+                 oSHIT=None):
+        # call parent constructor
+        # inherit relevant app objects
         super(OutPacket, self).__init__(oSHIT=oSHIT)
 
         # set header fields
@@ -142,3 +142,16 @@ class OutPacket(Packet):
         flags += self.NACK << 6  # second bit
         flags += self.EOF << 5   # third bit
         return bytes([seq]) + bytes([flags])
+
+    def set_seq(self, seq):
+        """ Updates SEQ and constructs new header. """
+        self.logger.log(3, "Setting outgoing SEQ: " + str(seq))
+        self.SEQ = seq
+        self.header = self.construct_header()
+
+    def set_txtime(self):
+        """ Sets transmission time for the packet.
+        Used to handle timeouted packets.
+        Not yet implemented.
+        """
+        pass
