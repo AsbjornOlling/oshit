@@ -61,18 +61,18 @@ class Logic:
         while True:
             # TODO FUCKING IMPLEMENT
 
-            # figure out how big the window is
+            # figure out how big the current window is
             openwsize = 0
             i = self.transport.txmin
             while i != self.transport.txmax:
                 i = (i + 1) % 256
                 openwsize += 1
 
-            if openwsize > len(self.transport.txwindow):
-                pck = self.get_next_packet()
-                # TODO set packet SEQuence no
-                # TODO implement send method in Transport
-                self.transport.send_packet(pck)
+            # if there are empty slots in the window
+            # and there are unsent packets in Logic
+            if openwsize > len(self.transport.txwindow) and self._out:
+                pck = self._out.pop(0)
+                self.transport.send_payload(pck)
 
             else:  # if no room for packets, sleep
                 self._outlock.acquire()
@@ -91,7 +91,7 @@ class Logic:
 
         # wake thread
         self._inlock.acquire()
-        self.logger.log(3, "Waking Logic._inloop")
+        self.logger.log(3, "Transport waking Logic._inloop")
         self._inlock.notify()
         self._inlock.release()
 
@@ -99,20 +99,24 @@ class Logic:
         """ Function to be called by Transport object.
         Wakes the outloop thread to start filling `txwindow`.
         """
-        # TODO
-        self._outlock.acquire()
-        self.logger.log(3, "Waking Logic._outloop")
-        self._outlock.notify()
-        self._outlock.release()
+        # only wake _outloop if there are unsent packets
+        if self._out:
+            self._outlock.acquire()
+            self.logger.log(3, "Transport waking Logic._outloop")
+            self._outlock.notify()
+            self._outlock.release()
 
     def handle_incoming(self, pck):
         """ Should be implemented to interpret incoming Packets. """
-        pass
+        self.logger.log(0, "Logic.handle_incoming() should never be run. "
+                        + "It should be overwritten by inheriting class.")
 
-    def get_next_packet(self):
-        """ This should be implemented to return the appropriate packet,
-        depending on business logic state, or None if none are applicable.
+    def send(self, pck):
+        """ Sends a Packet using the Transport module.
+        This function should be called by the Logic module programmer,
+        with a Packet object to send.
         """
-        self.logger.log(0, "This method should never run. "
-                        + "It should be overriden by child classes.")
-
+        self._outlock.acquire()
+        self._out.append(pck)
+        self._outlock.notify()
+        self._outlock.release()
