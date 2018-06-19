@@ -16,8 +16,6 @@ class Logic:
         self._in = []
         self._out = []
 
-        self.start_threads()
-
     def start_threads(self):
         """ Start the threads that handle transport object communication """
         self.logger.log(2, "Making logic threads.")
@@ -59,8 +57,29 @@ class Logic:
         Fills `Transport.txwindow` with new packets.
         Asks for packets by calling `self.get_next_packet()`
         """
-        # TODO
-        pass
+        # TODO close this fucking loop
+        while True:
+            # TODO FUCKING IMPLEMENT
+
+            # figure out how big the window is
+            openwsize = 0
+            i = self.transport.txmin
+            while i != self.transport.txmax:
+                i = (i + 1) % 256
+                openwsize += 1
+
+            if openwsize > len(self.transport.txwindow):
+                pck = self.get_next_packet()
+                # TODO set packet SEQuence no
+                # TODO implement send method in Transport
+                self.transport.send_packet(pck)
+
+            else:  # if no room for packets, sleep
+                self._outlock.acquire()
+                self.logger.log(3, "_outloop sleeping.")
+                self._outlock.wait()
+                self._outlock.release()
+                self.logger.log(3, "_outloop woken up.")
 
     def tr_new_incoming(self, pck):
         """ Function to be called by Transport object.
@@ -76,14 +95,17 @@ class Logic:
         self._inlock.notify()
         self._inlock.release()
 
-    def tr_new_outgoing():
+    def tr_new_outgoing(self):
         """ Function to be called by Transport object.
         Wakes the outloop thread to start filling `txwindow`.
         """
         # TODO
-        pass
+        self._outlock.acquire()
+        self.logger.log(3, "Waking Logic._outloop")
+        self._outlock.notify()
+        self._outlock.release()
 
-    def handle_incoming(self):
+    def handle_incoming(self, pck):
         """ Should be implemented to interpret incoming Packets. """
         pass
 
