@@ -16,34 +16,43 @@ class Logic:
         self._in = []
         self._out = []
 
+        self.start_threads()
+
     def start_threads(self):
         """ Start the threads that handle transport object communication """
+        self.logger.log(2, "Making logic threads.")
         # thread locks
         self._inlock = threading.Condition()
         self._outlock = threading.Condition()
 
         # start threads
-        self.t_in = threading.Thread(target=self._inloop(),
-                                     args=(self._inlock))
+        self.t_in = threading.Thread(name="Logic's incoming thread",
+                                     target=self._inloop,
+                                     args=())
+        self.t_out = threading.Thread(name="Logic's outgoing thread",
+                                      target=self._outloop,
+                                      args=())
         self.t_in.start()
-        self.t_out = threading.Thread(target=self._outloop(),
-                                      args=(self._outlock))
         self.t_out.start()
 
-    def _inloop(self, inlock):
+    def _inloop(self):
         """ Wakes when new packets are received from Transport.
         Reads packets from `_in`, and sleeps when it's empty.
         Passes packets to business logic with `self.handle_incoming()`
         """
+        self.logger.log(3, "Starting Logic._inloop()")
         # TODO handle closing shit
         while True:
             if self._in:
+                self.logger.log(3, "_inloop() processing packet.")
                 pck = self._in.pop(0)
                 self.handle_incoming(pck)
             else:  # wait for notify if list is empty
-                inlock.acquire()
-                inlock.wait()
-                inlock.release()
+                self.logger.log(3, "_inloop() going to sleep.")
+                self._inlock.acquire()
+                self._inlock.wait()
+                self.logger.log(3, "_inloop() woken up.")
+                self._inlock.release()
 
     def _outloop(self):
         """ Wakes when there's room for packets in Transport.
@@ -58,10 +67,14 @@ class Logic:
         `pck` should be a newly received `InPacket` object.
         Adds the packet to an internal list, and wakes the caller thread.
         """
+        # add to internal list
         self._in.append(pck)
-        self.inlock.acquire()
-        self.inlock.notify()
-        self.inlock.release()
+
+        # wake thread
+        self._inlock.acquire()
+        self.logger.log(3, "Waking Logic._inloop")
+        self._inlock.notify()
+        self._inlock.release()
 
     def tr_new_outgoing():
         """ Function to be called by Transport object.

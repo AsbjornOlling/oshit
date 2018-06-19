@@ -1,10 +1,11 @@
+#!/usr/bin/env python
+
 import sys
 sys.path.insert(0, '../oshit')
-
 from oshit import oSHIT
 from logic import Logic
 from transport import Transport
-from filehandler import FileHandler
+# from filehandler import FileHandler
 
 
 class TestLogic(Logic):
@@ -25,6 +26,7 @@ class TestLogic(Logic):
         self.transp = self.connect()
 
     def connect(self):
+        """ Make a Transport object to the given address. """
         return Transport(CONNECT_ADDR=self.CONNECT_ADDR,
                          LOCAL_ADDR=("127.0.0.1", 6666),
                          logic=self)
@@ -33,11 +35,15 @@ class TestLogic(Logic):
         """ Mandatory Logic method. Handles incoming packets.
         This one just prints the payload.
         """
-        packstring = "\t\t### TEST PACKET INFO ###\n"
-        packstring += "\t\tSEQ: " + str(pck.SEQ) + "\n"
         payload = pck.get_payload()
-        packstring += "\t\tPAYLOAD: " + str(payload)
-        print(packstring)
+        flagstring = "None"
+        flagstring = "ACK" if pck.ACK else flagstring
+        flagstring = "NACK" if pck.NACK else flagstring
+        flagstring = "EOF" if pck.EOF else flagstring
+        self.logger.log(1, "Logic read packet:\n"
+                           + "\tSEQ: \t\t" + str(pck.SEQ) + "\n"
+                           + "\tFLAGS: \t\t" + flagstring + "\n"
+                           + "\tPAYLOAD: \t" + str(payload))
 
     def get_next_packet(self):
         self.logger.log(1, "Logic is being asked for new packet.")

@@ -132,20 +132,18 @@ class Transport:
         on to application layer logic.
         """
         err = False
-        # TODO:
-        # implement resizing rxbounds
-
         # test window bounds
         if not self.check_rxbounds(paypck):
             # error logging for this in self.check_rxbounds
             err = True
 
-        # if the packet is out of order
-        if (paypck.SEQ != (self.lastreceived + 1) % 256
-           and not err):
+        # (if the packet is out of order
+        # or if there are out of order packets in buffer)
+        # and packet is within window
+        if ((paypck.SEQ != (self.lastreceived + 1) % 256
+           or self.rxbuffer) and not err):
             err = True
-            self.logger.log(0, "Packet arrived out of order, "
-                            + "would be adding to buffer, IMPLEMENT ME pls.")
+            self.logger.log(2, "Packet arrived out of order.")
             # redirect packet to rxbuffer
             self.in_unordered(paypck)
             # TODO
@@ -194,10 +192,10 @@ class Transport:
 
         # send the ACK
         if sendack:
-            self.send_ack(pck.SEQ + 1)  # TODO test
+            self.send_ack((pck.SEQ + 1) % 256)
 
     def in_unordered(self, pck):
-        """ Handle packet arriving out of order.
+        """Handle packet arriving out of order.
         Add the packet in the correct position of self.rxbuffer,
         and check if the next expected packet has come to self.rxbuffer yet.
         This is the only method that interacts with self.rxbuffer.
@@ -206,40 +204,47 @@ class Transport:
 
         if not self.rxbuffer:
             self.logger.log(3, "rxbuffer was empty. Adding first packet.")
-            self.rxbuffer.append(pck)
+            self.send_ack(nack=True, seq=self.lastreceived + 1)
 
-        # TODO: consider re-working this insertion algorithm
-        precedingseq = (pck.SEQ - 1) % 256
-        succeedingseq = (pck.SEQ + 1) % 256
-        inserted = False
-        for bufpck in self.rxbuffer:
-            # if the packet in buffer is the succeeding packet
-            # add the new packet before the packet in buffer
-            if bufpck.SEQ == succeedingseq:
-                self.rxbuffer.insert(self.rxbuffer.index(bufpck), pck)
-                inserted = True
-            # if the packet in buffer has the preceding SEQ
-            # add the new packet after the packet in buffer
-            elif bufpck.SEQ == precedingseq:
-                self.rxbuffer.insert(self.rxbuffer.index(bufpck) + 1, pck)
-                inserted = True
+        # add to (unsorted) buffer
+        self.rxbuffer.append(pck)
 
-            if inserted:
-                self.logger.log(3, "Inserting at specific position in buffer.")
-                break
-
-        # if neither the preceeding or succeeding packet is found
-        # just add the packet
-        if not inserted:
-            self.logger.log(0, "Could not find appropriate spot in rxbuffer!")
-
+        # check for the expected packet
         # start emptying buffer if the missing packet is in the buffer
-        while self.rxbuffer[0].SEQ == self.lastreceived + 1:
-            # take the missing packet out of the buffer
-            validpck = self.rxbuffer.pop(0)
-            # don't send ACK if the next packet is still in order
-            sendack = self.rxbuffer[0].SEQ != self.lastreceived + 2
-            self.in_validpack(validpck, sendack=sendack)
+        self.unbuffer_expected()
+
+    def unbuffer_expected(self, level=0):
+        """ Removes all packets with ordered SEQs from the buffer.
+        It searches for a valid SEQ, then recursively searches for
+        another valid packet when another valid is found.
+        """
+        self.logger.log(3, "Unbuffering: Searching for packet with SEQ: "
+                        + str((self.lastreceived + 1) % 256) + " in buffer.")
+
+        # search for packet with appropriate seq
+        found = False
+        for bufpck in self.rxbuffer[:]:
+            if bufpck.SEQ == (self.lastreceived + 1) % 256:
+                found = True
+                validpck = bufpck
+                break
+            else:
+                self.logger.log(3, "Unbuffering: "
+                                + "packet with SEQ " + str(bufpck.SEQ)
+                                + " not a match")
+
+        # accept found packet
+        if found:
+            self.logger.log(3, "Unbuffering: Accepting packet with SEQ: "
+                            + str(validpck.SEQ))
+            self.in_validpack(validpck, sendack=False)
+            self.rxbuffer.remove(validpck)
+            # recurse to look for next packet
+            self.unbuffer_expected(level=level + 1)
+
+        if level == 0 and found:
+            self.logger.log(3, "Unbuffering: Ended. Sending ACK.")
+            self.send_ack((self.lastreceived + 1) % 256)
 
     def send_ack(self, seq, nack=False):
         """ Queues ACK packet with the argument as SEQ for sending.
@@ -250,7 +255,7 @@ class Transport:
 
         if ack:
             self.logger.log(3, "Sending ACK: " + str(seq))
-        if nack:
+        elif nack:
             self.logger.log(3, "Sending NACK: " + str(seq))
 
         # create ACK packet with empty payload
