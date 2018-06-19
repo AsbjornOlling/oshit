@@ -79,10 +79,14 @@ class Config(collections.MutableMapping):
                             type=str, help="password")
 
         parser.add_argument("-l", "--loglevel",
-                            type=int, choices=list(range(0, 4)))
+                            type=int, choices=list(range(0, 4)),
+                            help="Choose a loglevel between 1 and 3",
+                            metavar='[0,3]')
 
         parser.add_argument("-lp", "--localport",
-                            type=int, choices=list(range(1, 65535)))
+                            type=int, choices=list(range(1, 65535)),
+                            help="Choose a port between 1 and 65534",
+                            metavar='[1,65534]')
         # return Namespace obj
         return parser.parse_args()
 
