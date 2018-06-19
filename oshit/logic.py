@@ -69,7 +69,7 @@ class Logic:
                 openwsize += 1
 
             # if there are empty slots in the window
-            # and there are unsent packets in Logic
+            # and there are unsent packets
             if openwsize > len(self.transport.txwindow) and self._out:
                 pck = self._out.pop(0)
                 self.transport.send_payload(pck)

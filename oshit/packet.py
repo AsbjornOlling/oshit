@@ -118,6 +118,7 @@ class OutPacket(Packet):
         self.check_fields()
 
         # set header and payload
+        # TODO CONSIDER LEAVING header is unset until set_seq
         self.header = self.construct_header()
         self.payload = payload
 
@@ -136,7 +137,8 @@ class OutPacket(Packet):
 
     def construct_header(self):
         """ Return header bytes object based on class field."""
-        seq = self.SEQ
+        # set SEQ to 0 if not provided yet
+        seq = self.SEQ if self.SEQ is not None else 0
         flags = 0
         flags += self.ACK << 7   # first bit
         flags += self.NACK << 6  # second bit

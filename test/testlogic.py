@@ -9,21 +9,17 @@ from transport import Transport
 
 
 class TestLogic(Logic):
+    """ Class to test integration between Transport and Logic.
+    This just prints all incoming packets, sends nothing but ACKs.
+    """
     def __init__(self, CONNECT_ADDR=None, oSHIT=None):
-        self.CONNECT_ADDR = CONNECT_ADDR
-
         # parent constructor (make threads to communicate with transport)
+        # also get relevant inherted objects
         super(TestLogic, self).__init__(oSHIT=oSHIT)
-
-        # inherited objects
-        self.oSHIT = oSHIT
-        self.logger = oSHIT.logger
-        self.logger.log(1, "Test logic running!")
-
-        # open file
 
         # connect to peer
         self.transp = self.connect()
+        self.CONNECT_ADDR = CONNECT_ADDR
 
     def connect(self):
         """ Make a Transport object to the given address. """
@@ -36,6 +32,8 @@ class TestLogic(Logic):
         This one just prints the payload.
         """
         payload = pck.get_payload()
+
+        # Just print the incoming packet.
         flagstring = "None"
         flagstring = "ACK" if pck.ACK else flagstring
         flagstring = "NACK" if pck.NACK else flagstring
@@ -52,4 +50,4 @@ class TestLogic(Logic):
 
 if __name__ == '__main__':
     app = oSHIT()
-    logic = TestLogic(CONNECT_ADDR=("127.0.0.1", 5555), oSHIT=app)
+    # logic = TestLogic(CONNECT_ADDR=("127.0.0.1", 5555), oSHIT=app)

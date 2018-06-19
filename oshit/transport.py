@@ -33,7 +33,8 @@ class Transport:
         self.rxmin = 0
         self.rxmax = self.rxmin + self.WSIZE
         # Tx
-        self.txwindow = []      # packets to transmit (keep until ACK'ed)
+        self.txwindow = []      # packets to transmit
+        self.txbuffer = []      # for all transmitted packets (keep until ACK)
         self.lastreceived = -1  # counter for SEQ of last received payload
         self.txmin = 0          # transmission window bounds
         self.txmax = self.txmin + self.WSIZE  # default bounds = [0, 128[
@@ -106,12 +107,12 @@ class Transport:
         (As we know that they're properly received.)
         """
         ackseq = ackpck.SEQ
-        for winpck in self.txwindow[:]:  # copy of list to avoid mutation
-            if winpck.SEQ < ackseq:
-                # remove accepted packets from window
-                self.txwindow.remove(winpck)
+        for bufpck in self.txbuffer[:]:  # copy of list to avoid mutation
+            if bufpck.SEQ < ackseq:
+                # remove accepted packets from buffer
+                self.txbuffer.remove(bufpck)
                 self.txmax = (self.txmax + 1) % 256
-                # TODO: notify OutLogic of packetspace
+                # TODO: notify Logic._outloop of packetspace
 
     def in_nack(self, nackpck):
         """ Handle incoming NACK packets.
@@ -120,10 +121,13 @@ class Transport:
         nackseq = nackpck.SEQ
         self.logger.log(2, "Received NACK: " + str(nackseq)
                         + ". Re-transmitting.")
-        for winpck in self.txwindow:
-            if winpck.SEQ == nackseq:
+        for bufpck in self.txbuffer:
+            if bufpck.SEQ == nackseq:
                 # re-transmit (cut the queue)
-                self.tx.txqueue.insert(0, winpck)
+                self.tx.txlock.acquire()
+                self.tx.txqueue.insert(0, bufpck)
+                self.tx.txlock.notify()
+                self.tx.txlock.release()
 
     def in_payload(self, paypck):
         """ Handle incoming packet with payload.
@@ -268,6 +272,21 @@ class Transport:
         self.tx.txlock.notify()
         self.tx.txlock.release()
 
+    def send_payload(self, pck):
+        """ Called by Logic, adds a new packet to for transmission. """
+        # calculate and set SEQ
+        seq = self.txmin + len(self.txwindow)
+        pck.set_seq(seq)
+
+        # add to window
+        self.txwindow.append(pck)
+
+        # add to txqueue and notify Outgoing
+        self.tx.txlock.acquire()
+        self.tx.txqueue.append(pck)
+        self.tx.txlock.notify()
+        self.tx.txlock.release()
+
 
 class Incoming(threading.Thread):
     """ Class to receive and process incoming packets """
@@ -379,10 +398,19 @@ class Outgoing(threading.Thread):
         # TODO: handle closing socket
         while True:
             if txqueue:  # if list has element
+                # get first packet from queue
                 pck = txqueue.pop(0)
-                # pck.set_txtime()                  # TODO: implement
-                self.sock.sendall(pck.get_bytes())  # TODO: implement
-                self.parent.txmin = (self.parent.txmin + 1) % 256
+
+                # set transmission time and transmit
+                pck.set_txtime()  # TODO: implement
+                self.sock.sendall(pck.get_bytes())
+
+                # remove from window and update bounds
+                # only for payload packets with tracked SEQ
+                if pck in self.parent.txwindow:
+                    self.parent.txwindow.remove(pck)
+                    self.parent.txbuffer.append(pck)
+                    self.parent.txmin = (self.parent.txmin + 1) % 256
             else:  # if empty, wait for element to be added
                 txlock.acquire()
                 txlock.wait()
