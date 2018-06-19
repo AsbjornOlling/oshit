@@ -16,7 +16,8 @@ class FileHandler():
         self.logger.log(2, "Initializing filehandler object.")
 
         # Open the file
-        self._readfile = open(self.config["file"], 'rb')
+        if self.config['send']:
+            self._readfile = open(self.config["file"], 'rb')
 
     def read_chunk(self):
         """ Use the path from config to read chunks of file.
