@@ -43,7 +43,7 @@ class Config(collections.MutableMapping):
 
         self.fix_loglevel()  # quickfix :^)
 
-        # combine the three sources
+        # make a dict from the three sources
         self.store = self.make_dict()
 
         # quickfix :^)
@@ -152,6 +152,7 @@ class Config(collections.MutableMapping):
         else:
             if os.path.exists(configdict["output"]):
                 self.logger.log(0, "Choose a output file that dosn't exists")
+                quit()
 
     # These last methods are only in place to let Config behave as a dict
     def __getitem__(self, key):
