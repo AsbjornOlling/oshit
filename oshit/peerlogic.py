@@ -66,6 +66,7 @@ class SendLogic(PeerLogic):
 
     def dump_file(self):
         """ Just sends a file by dumping the entire thing, """
+        self.logger.log(1, "Sending file...")
         eof = False
         i = 0
         while not eof:
@@ -105,7 +106,7 @@ class ReceiveLogic(PeerLogic):
 
     def receive_file(self):
         """ Write packets to file until an EOF is received. """
-        self.logger.log(1, "Receiving file.")
+        self.logger.log(1, "Receiving file...")
         eof = False
         while not eof:
             # get packet
