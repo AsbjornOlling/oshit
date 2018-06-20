@@ -1,4 +1,5 @@
 import os
+import hashlib
 
 
 class FileHandler():
@@ -41,3 +42,10 @@ class FileHandler():
         _writefile = open(self.config['output'], mode)
         _writefile.write(writedata)
         _writefile.close()
+
+    def gen_checksum(self, filepath):
+        md5_hash = hashlib.md5()
+        with open(filepath, 'rb') as f:
+            for filechunk in iter(lambda: f.read(4096), b''):
+                md5_hash.update(filechunk)
+        return md5_hash.hexdigest()
