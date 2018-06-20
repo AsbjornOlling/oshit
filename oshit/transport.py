@@ -1,6 +1,7 @@
 # python imports
 import socket
 import threading
+import time
 
 # application imports
 import packet
@@ -107,6 +108,7 @@ class Transport:
         (As we know that they're properly received.)
         """
         ackseq = ackpck.SEQ
+        self.logger.log(2, "Got ACK: " + str(ackseq))
         for bufpck in self.txbuffer[:]:  # copy of list to avoid mutation
             if bufpck.SEQ < ackseq:
                 # remove accepted packets from buffer
@@ -119,8 +121,7 @@ class Transport:
         Find packet with the NACK's SEQ, and retransmit it.
         """
         nackseq = nackpck.SEQ
-        self.logger.log(2, "Received NACK: " + str(nackseq)
-                        + ". Re-transmitting.")
+        self.logger.log(2, "Got NACK: " + str(nackseq))
         for bufpck in self.txbuffer:
             if bufpck.SEQ == nackseq:
                 # re-transmit (cut the queue)
@@ -135,6 +136,8 @@ class Transport:
         Check if the SEQ is in order, before passing
         on to application layer logic.
         """
+        self.logger.log(2, "Got SEQ: " + str(paypck.SEQ))
+
         err = False
         # test window bounds
         if not self.check_rxbounds(paypck):
@@ -148,10 +151,8 @@ class Transport:
            or self.rxbuffer) and not err):
             err = True
             self.logger.log(2, "Packet arrived out of order.")
-            # redirect packet to rxbuffer
+            # redirect packet to rxbuffer logic
             self.in_unordered(paypck)
-            # TODO
-            # have logic to empty rxbuffer
 
         # if packet passed checks
         if not err:
@@ -186,7 +187,7 @@ class Transport:
         """
         # update rxbounds
         self.rxmin = (self.rxmin + 1) % 256
-        self.rxmax = (self.rxmax + 1) % 256  # TODO Laarss... why after ack
+        self.rxmax = (self.rxmax + 1) % 256
 
         # update SEQ count (will always be in 0-255)
         self.lastreceived = pck.SEQ
@@ -204,10 +205,10 @@ class Transport:
         and check if the next expected packet has come to self.rxbuffer yet.
         This is the only method that interacts with self.rxbuffer.
         """
-        self.logger.log(3, "Bufferring packet with SEQ: " + str(pck.SEQ))
+        self.logger.log(2, "Bufferring packet with SEQ: " + str(pck.SEQ))
 
         if not self.rxbuffer:
-            self.logger.log(3, "rxbuffer was empty. Adding first packet.")
+            self.logger.log(2, "rxbuffer was empty. Adding first packet.")
             self.send_ack(nack=True, seq=self.lastreceived + 1)
 
         # add to (unsorted) buffer
@@ -239,7 +240,7 @@ class Transport:
 
         # accept found packet
         if found:
-            self.logger.log(3, "Unbuffering: Accepting packet with SEQ: "
+            self.logger.log(2, "Unbuffering: Accepting packet with SEQ: "
                             + str(validpck.SEQ))
             self.in_validpack(validpck, sendack=False)
             self.rxbuffer.remove(validpck)
@@ -275,7 +276,7 @@ class Transport:
     def send_payload(self, pck):
         """ Called by Logic, adds a new packet to for transmission. """
         # calculate and set SEQ
-        seq = self.txmin + len(self.txwindow)
+        seq = (self.txmin + len(self.txwindow)) % 256
         pck.set_seq(seq)
 
         # add to window
@@ -345,25 +346,25 @@ class Incoming(threading.Thread):
         """
         # get list of other active threads
         otherthreads = threads[:]
-        self.logger.log(3, "Other active parserthreads: "
+        self.logger.log(3, "Parser: Other active parserthreads: "
                         + str(len(otherthreads)))
 
         # parse the data
         pck = packet.InPacket(data, oSHIT=self.oSHIT)
 
-        self.logger.log(3, "Packet object created.")
+        self.logger.log(3, "Parser: created packet")
 
         # wait for all previously started threads to complete
         for thread in otherthreads:
             thread.join()
 
         # guaranteed sequential append
-        self.logger.log(3, "Data parser thread adding Packet to rxqueue")
+        self.logger.log(3, "Parser: adding Packet to rxqueue")
         self.rxlock.acquire()
         self.rxqueue.append(pck)
         self.rxlock.notify()  # notify transport
         self.rxlock.release()
-        self.logger.log(3, "Terminating data parser thread")
+        self.logger.log(3, "Parser: Terminating")
 
 
 class Outgoing(threading.Thread):
@@ -408,6 +409,7 @@ class Outgoing(threading.Thread):
                 # remove from window and update bounds
                 # only for payload packets with tracked SEQ
                 if pck in self.parent.txwindow:
+                    self.logger.log(2, "Sending SEQ: " + str(pck.SEQ))
                     self.parent.txwindow.remove(pck)
                     self.parent.txbuffer.append(pck)
                     self.parent.txmin = (self.parent.txmin + 1) % 256

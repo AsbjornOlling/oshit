@@ -1,4 +1,6 @@
+# standard imports
 import threading
+import time
 
 
 class Logic:
@@ -120,3 +122,4 @@ class Logic:
         self._out.append(pck)
         self._outlock.notify()
         self._outlock.release()
+        time.sleep(0.001)  # XXX: wait one mili.. LAAAaaars!
