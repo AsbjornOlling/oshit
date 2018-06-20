@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 
+# standard imports
+import time
 import sys
+
+# application imports
 sys.path.insert(0, '../oshit')
 from oshit import oSHIT
 from logic import Logic
@@ -42,8 +46,7 @@ class TestRecvPeer(Logic):
         data = pck.get_payload()
         self.fileh.write_chunk(data)
         if pck.EOF:
-            self.logger.log(1, "TestRecvPeer got EOF. Finishing.")
-            quit()
+            self.logger.log(1, "TestRecvPeer got EOF. Idling.")
 
     def get_next_packet(self):
         """ Mandatory Logic method. Creates outgoing packets.
@@ -95,10 +98,10 @@ class TestSendPeer(Logic):
             self.logger.log(3, "Dumping file chunk " + str(i))
             data, eof = self.fileh.read_chunk()
             pck = packet.OutPacket(data, eof=eof, oSHIT=self.oSHIT)
+
             self.send(pck)
 
-        self.logger.log(3, "Hit EOF. Exiting.")
-        quit()
+        self.logger.log(1, "Hit EOF. Exiting loop.")
 
 
 if __name__ == '__main__':

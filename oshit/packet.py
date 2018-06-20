@@ -66,15 +66,16 @@ class InPacket(Packet):
         # split data
         self.header = data[0][:self.HSIZE]
         self.payload = data[0][self.HSIZE:]
-        self.logger.log(3, "Got header: "
-                        + str(int(len(self.header))) + str(type(self.header))
-                        + " and payload: "
-                        + str(int(len(self.payload)))
-                        + str(type(self.payload)))
 
         # parse header
         self.SEQ = self.read_seq(self.header)
         self.ACK, self.NACK, self.EOF = self.read_flags(self.header)
+
+        self.logger.log(3, "InPacket:\n"
+                        + "\tSEQ: " + str(self.SEQ) + "\n"
+                        + "\tACK: " + str(self.ACK) + "\n"
+                        + "\tNACK: " + str(self.NACK) + "\n"
+                        + "\tEOF: " + str(self.EOF))
 
         # TODO: decryption
         # ? checksum
