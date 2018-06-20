@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 
+# application imports
 import logger
-import transport
-import filehandler
 import config
-from logic import Logic
+from peerlogic import SendLogic, ReceiveLogic
+
 
 class oSHIT:
     def __init__(self):
@@ -13,6 +13,12 @@ class oSHIT:
         temploglevel = config.Config.default["loglevel"]
         self.logger = logger.Logger(self, temploglevel)
         self.config = config.Config(self)
+
+        # start logic
+        if self.config["send"]:
+            self.logic = SendLogic(oSHIT=self)
+        elif self.config["recv"]:
+            self.logic = ReceiveLogic(oSHIT=self)
 
 
 if __name__ == '__main__':

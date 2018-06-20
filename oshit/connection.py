@@ -11,7 +11,7 @@ class Connection:
     Provides application-level logic for handling an oSHIT connection.
     This is an abstract parent class (not to be instantiated).
     """
-    def __init__(self, oSHIT=None):
+    def __init__(self, addr, oSHIT=None):
         # inherit objects
         self.oSHIT = oSHIT
         self.logger = oSHIT.logger
@@ -21,10 +21,15 @@ class Connection:
         self._in = []
         self._out = []
 
-    def connect(self):
+        # start connection
+        self.localaddr = ("0.0.0.0", self.config["localport"])
+        self.transport = self.connect(addr)
+        self.start_threads()
+
+    def connect(self, addr):
         """ Make a Transport object to the given address. """
-        return Transport(CONNECT_ADDR=self.CONNECT_ADDR,
-                         LOCAL_ADDR=self.LOCAL_ADDR,
+        return Transport(CONNECT_ADDR=addr,
+                         LOCAL_ADDR=self.localaddr,
                          logic=self)
 
     def start_threads(self):
@@ -34,34 +39,10 @@ class Connection:
         self._inlock = threading.Condition()
         self._outlock = threading.Condition()
 
-        # start threads
-        self.t_in = threading.Thread(name="Connection's incoming thread",
-                                     target=self._inloop,
-                                     args=())
         self.t_out = threading.Thread(name="Connection's outgoing thread",
                                       target=self._outloop,
                                       args=())
-        # self.t_in.start() TODO: remove?
         self.t_out.start()
-
-    def _inloop(self):
-        """ Wakes when new packets are received from Transport.
-        Reads packets from `_in`, and sleeps when it's empty.
-        Passes packets to business logic with `self.handle_incoming()`
-        """
-        self.logger.log(3, "Starting Conenction._inloop()")
-        # TODO handle closing shit
-        while True:
-            if self._in:
-                self.logger.log(3, "_inloop() processing packet.")
-                pck = self._in.pop(0)
-                self.handle_incoming(pck)
-            else:  # wait for notify if list is empty
-                self.logger.log(3, "_inloop() going to sleep.")
-                self._inlock.acquire()
-                self._inlock.wait()
-                self.logger.log(3, "_inloop() woken up.")
-                self._inlock.release()
 
     def get_packet(self):
         """ Returns one oSHIT packet.
@@ -69,7 +50,7 @@ class Connection:
         there are none when it was called.
         """
         if self._in:  # just get the packet if ready
-            self.logger.log(3, "_inloop() processing packet.")
+            self.logger.log(3, "get_packet() processing packet.")
             pck = self._in.pop(0)
         else:
             # block until new packet arrives
@@ -137,11 +118,6 @@ class Connection:
             self.logger.log(3, "Transport waking Connection._outloop")
             self._outlock.notify()
             self._outlock.release()
-
-    def handle_incoming(self, pck):
-        """ Should be implemented to interpret incoming Packets. """
-        self.logger.log(0, "Connection.handle_incoming() should never be run. "
-                        + "It should be overwritten by inheriting class.")
 
     def send(self, pck):
         """ Sends a Packet using the Transport module.

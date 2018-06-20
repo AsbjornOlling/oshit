@@ -83,11 +83,17 @@ class ReceiveLogic(PeerLogic):
         super(ReceiveLogic, self).__init__(oSHIT=oSHIT)
         self.logger.log(2, "Starting ReceiveLogic")
 
+        # connect to a sender peer
         self.sendpeer = self.find_peer()
 
-        self.correctmd5 = self.get_correct_checksum()
+        # get the file checksum
+        self.correctmd5 = self.get_correct_checksum()[2:-1]
 
+        # get and write the file contents
         self.receive_file()
+
+        # compare checksums
+        self.control_checksum()
 
     def get_correct_checksum(self):
         """ Interprets the next packet as a string.
@@ -98,6 +104,7 @@ class ReceiveLogic(PeerLogic):
         return correctmd5
 
     def receive_file(self):
+        """ Write packets to file until an EOF is received. """
         self.logger.log(1, "Receiving file.")
         eof = False
         while not eof:
@@ -110,3 +117,18 @@ class ReceiveLogic(PeerLogic):
 
             eof = pck.EOF
         self.logger.log(1, "Transfer finished.")
+
+    def control_checksum(self):
+        """ Compare the correct checksum to the downloaded file. """
+        # get checksum of downloaded file
+        testmd5 = self.file.gen_checksum(self.config["output"])
+
+        self.logger.log(2, "Comparing checksums: \n\t"
+                        + "1" + str(self.correctmd5) + "\n\t"
+                        + "2" + str(testmd5))
+
+        # compare checksums
+        if testmd5 == self.correctmd5:
+            self.logger.log(1, "File matches checksum.")
+        else:
+            self.logger.log(0, "File doesn't match checksum!")
