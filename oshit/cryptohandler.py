@@ -22,7 +22,7 @@ class CryptoHandler:
         """
         Generates a RSA key object
         """
-        publickey = self.key.publickey()
+        publickey = self.key.publickey().exportKey('DER')
         return publickey
 
     def rsa_encrypt(self, publickey, data):
@@ -30,7 +30,8 @@ class CryptoHandler:
         Used to RSA encrypt data.
         Takes publickey and data to encrypt as arguments.
         """
-        encrypteddata = publickey.encrypt(data, 64)
+        new_key = RSA.importKey(publickey)
+        encrypteddata = new_key.encrypt(data, 64)
         return encrypteddata
 
     def rsa_decrypt(self, data):
