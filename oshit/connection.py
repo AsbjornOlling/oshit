@@ -2,11 +2,14 @@
 import threading
 import time
 
+# application imports
+from transport import Transport
 
-class Logic:
-    """ Parent class to logic modules.
+
+class Connection:
+    """ Wrapper around the Tranport module.
+    Provides application-level logic for handling an oSHIT connection.
     This is an abstract parent class (not to be instantiated).
-    Mainly handles interaction with Transport objects
     """
     def __init__(self, oSHIT=None):
         # inherit objects
@@ -18,6 +21,12 @@ class Logic:
         self._in = []
         self._out = []
 
+    def connect(self):
+        """ Make a Transport object to the given address. """
+        return Transport(CONNECT_ADDR=self.CONNECT_ADDR,
+                         LOCAL_ADDR=self.LOCAL_ADDR,
+                         logic=self)
+
     def start_threads(self):
         """ Start the threads that handle transport object communication """
         self.logger.log(2, "Making logic threads.")
@@ -26,13 +35,13 @@ class Logic:
         self._outlock = threading.Condition()
 
         # start threads
-        self.t_in = threading.Thread(name="Logic's incoming thread",
+        self.t_in = threading.Thread(name="Connection's incoming thread",
                                      target=self._inloop,
                                      args=())
-        self.t_out = threading.Thread(name="Logic's outgoing thread",
+        self.t_out = threading.Thread(name="Connection's outgoing thread",
                                       target=self._outloop,
                                       args=())
-        self.t_in.start()
+        # self.t_in.start() TODO: remove?
         self.t_out.start()
 
     def _inloop(self):
@@ -40,7 +49,7 @@ class Logic:
         Reads packets from `_in`, and sleeps when it's empty.
         Passes packets to business logic with `self.handle_incoming()`
         """
-        self.logger.log(3, "Starting Logic._inloop()")
+        self.logger.log(3, "Starting Conenction._inloop()")
         # TODO handle closing shit
         while True:
             if self._in:
@@ -53,6 +62,27 @@ class Logic:
                 self._inlock.wait()
                 self.logger.log(3, "_inloop() woken up.")
                 self._inlock.release()
+
+    def get_packet(self):
+        """ Returns one oSHIT packet.
+        This command blocks until a new packet is received, if
+        there are none when it was called.
+        """
+        if self._in:  # just get the packet if ready
+            self.logger.log(3, "_inloop() processing packet.")
+            pck = self._in.pop(0)
+        else:
+            # block until new packet arrives
+            self.logger.log(3, "get_packet() blocking.")
+            self._inlock.acquire()
+            self._inlock.wait()
+
+            # get packet
+            pck = self._in.pop(0)
+
+            self.logger.log(3, "get_packet() releasing")
+            self._inlock.release()
+        return pck
 
     def _outloop(self):
         """ Wakes when there's room for packets in Transport.
@@ -93,7 +123,7 @@ class Logic:
 
         # wake thread
         self._inlock.acquire()
-        self.logger.log(3, "Transport waking Logic._inloop")
+        self.logger.log(3, "Transport waking Connection._inloop")
         self._inlock.notify()
         self._inlock.release()
 
@@ -104,18 +134,18 @@ class Logic:
         # only wake _outloop if there are unsent packets
         if self._out:
             self._outlock.acquire()
-            self.logger.log(3, "Transport waking Logic._outloop")
+            self.logger.log(3, "Transport waking Connection._outloop")
             self._outlock.notify()
             self._outlock.release()
 
     def handle_incoming(self, pck):
         """ Should be implemented to interpret incoming Packets. """
-        self.logger.log(0, "Logic.handle_incoming() should never be run. "
+        self.logger.log(0, "Connection.handle_incoming() should never be run. "
                         + "It should be overwritten by inheriting class.")
 
     def send(self, pck):
         """ Sends a Packet using the Transport module.
-        This function should be called by the Logic module programmer,
+        This function should be called by the Connection module programmer,
         with a Packet object to send.
         """
         self._outlock.acquire()
