@@ -14,16 +14,17 @@ class Config(collections.MutableMapping):
     Inherits from dict, so config values kan be fetched
     with a simple: config["key"].
     """
-    default = {"send": False,
-               "recv": False,
-               "introducer": "127.0.0.1:6564",
-               "file": "./upfile.txt",
-               "output": "./downfile.txt",
-               "crypto": "aes",
-               "password": "ChangeMe",
-               "loglevel": 1,
-               "logfile": "./log",
-               "localport": 1423
+    default = {"send": False,                   # Send mode
+               "recv": False,                   # Receive mode
+               "introducer": "127.0.0.1:6564",  # ip:port of introducer to use
+               "direct": "",                    # Skip introduce and use IP
+               "file": "./upfile.txt",          # Path of file to send
+               "output": "./downfile.txt",      # Path to save received file to
+               "crypto": "aes",                 # Cryptogaphy to use
+               "password": "ChangeMe",          # Password for pairing
+               "loglevel": 1,                   # Loglevel. See logger
+               "logfile": "./log",              # Logfile to write to
+               "localport": 1423                # Local port to host on
                }  # defaults must be complete
 
     def __init__(self, oSHIT):
@@ -79,6 +80,9 @@ class Config(collections.MutableMapping):
 
         parser.add_argument("-i", "--introducer",
                             type=str, help="introducer server <host:port>")
+
+        parser.add_argument("-d", "--direct",
+                            type=str, help="direct peer <host:port>")
 
         parser.add_argument("-p", "--password",
                             type=str, help="password")
